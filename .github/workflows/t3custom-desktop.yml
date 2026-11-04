@@ -33,7 +33,6 @@ jobs:
             !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
           fetch-depth: 0
-          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - name: Install test browser
         run: vp exec --filter @t3tools/web playwright install --with-deps chromium
@@ -58,7 +57,6 @@ jobs:
             !/.repos/
             !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
-          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - name: Build Apple Silicon preview
         id: build
