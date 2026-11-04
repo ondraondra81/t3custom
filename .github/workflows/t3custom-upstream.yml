@@ -24,8 +24,13 @@ jobs:
         env:
           HAS_SYNC_KEY: ${{ secrets.T3CUSTOM_SYNC_SSH_KEY != '' }}
         run: test "$HAS_SYNC_KEY" = true
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+          sparse-checkout-cone-mode: false
           ref: custom
           fetch-depth: 0
           ssh-key: ${{ secrets.T3CUSTOM_SYNC_SSH_KEY }}
