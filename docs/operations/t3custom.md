@@ -13,7 +13,8 @@ and opens the packaged app against an isolated database fixture. Download its
 complete draft GitHub release; a manual workflow dispatch can request the same. Publish the draft
 after reviewing the checks and package. Integration PR builds only produce artifacts.
 
-This preview has no Developer ID signature or notarization and no automatic update feed.
+The preview is ad-hoc signed for Apple Silicon, with no Developer ID signature, notarization
+or automatic update feed. No Apple Developer account is needed for ad-hoc signing.
 Install each version manually; macOS may require allowing it in Privacy & Security.
 The fork uses `~/.t3custom` and a separate Chromium profile. It does not import an official
 installation's live state. Pair to an existing server through Connections, or add projects
@@ -27,7 +28,8 @@ inside it. The desktop's internal renderer origin stays compatible with upstream
 ## Upstream updates
 
 Once `custom` is the default branch, **T3 Custom upstream integration** checks stable upstream
-releases daily. It opens a draft integration PR and explicitly dispatches the desktop workflow for it.
+releases daily. `.t3custom-upstream` records the merged upstream commit; each integration updates
+it so validation covers the fork delta instead of every historical upstream change. It opens a draft integration PR and explicitly dispatches the desktop workflow for it.
 Merge conflicts stop the job, and existing integration branches are preserved for manual fixes.
 The explicit dispatch is needed because a push made with GitHub's workflow token does not start downstream workflows.
 Repository settings must permit Actions to create pull requests. The repository-only writable
@@ -35,8 +37,37 @@ deploy key in `T3CUSTOM_SYNC_SSH_KEY` pushes integration branches: GitHub's buil
 cannot push upstream commits that change workflow files. Rotate it by replacing the repository
 deploy key and Actions secret together; never use a personal account token for this job.
 
-Keep upstream's hosted-service, npm-publishing and release workflows disabled on the fork.
+Keep every upstream workflow disabled on the fork, including `ci.yml` (its Blacksmith runners
+are unavailable here), hosted-service deployments, npm publishing and releases.
 Our workflow has no upstream deployment secrets and never publishes the official npm package.
+
+## Separate MF1 server
+
+An official MF1 server remains usable from the custom desktop, but cannot store groups.
+Deploying the fork there is a separate operation after desktop acceptance; do not replace the
+live workshop server as part of testing this app.
+
+For a separate instance, check out the same `custom` commit as the desktop, install the Node
+version in `package.json` and Vite+, and provision native Linux build prerequisites (including
+`pkg-config` and the libsecret development headers) through the host's normal administration.
+From the checkout:
+
+```sh
+vp i --frozen-lockfile
+vp run --filter t3 build
+node apps/server/dist/bin.mjs --base-dir "$HOME/.t3custom-mf1" --host 127.0.0.1 --port 4780
+```
+
+Choose a free port and keep the T3 home outside any Git checkout so Scratch is available.
+This uses the source checkout's dependencies; retain that checkout when running the service.
+Expose it through the workshop's existing approved private routing or Tailscale setup and pair
+it in the desktop's Connections settings. Add projects to this separate instance.
+
+For an eventual migration, first stop only the server being migrated and back up its entire
+T3 home, including SQLite, settings, secrets and `userdata/t3custom`. Restore a copy into the
+new home, validate it on a separate port, then switch the service. Keep the old home and binary
+untouched for rollback; never run the old binary against a database the new one has migrated.
+If migrating an existing host identity, avoid serving both copies to the same client at once.
 
 ## Signed releases later
 

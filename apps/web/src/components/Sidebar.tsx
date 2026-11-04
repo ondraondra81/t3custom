@@ -1037,7 +1037,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     },
   });
   const organizer = useProjectGroups(serverConfigs);
-  const [groupEditor, setGroupEditor] = useState<GroupEditorTarget | null>(null);
+  const [groupEditor, setGroupEditorState] = useState<GroupEditorTarget | null>(null);
+  const setGroupEditor = (target: GroupEditorTarget | null) => {
+    organizer.clearError();
+    setGroupEditorState(target);
+  };
   const upstreamBoringSidebarEnabled = useBoringSidebarEnabled();
   const boringSidebarEnabled = organizer.enabled || upstreamBoringSidebarEnabled;
   const legacySidebarEnabled = useClientSettings((settings) => settings.legacySidebarEnabled);
@@ -3732,6 +3736,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         <ProjectGroupsEditor
           key={`${groupEditor.environmentId}:${groupEditor.group?.id ?? "new"}:${groupEditor.projectIds?.join(",") ?? ""}`}
           target={groupEditor}
+          threads={threads}
           controller={organizer}
           projects={projectGroups}
           onTarget={setGroupEditor}

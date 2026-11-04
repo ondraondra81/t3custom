@@ -115,44 +115,44 @@ export class ProjectGroupsError extends Schema.TaggedError<ProjectGroupsError>()
 }
 
 export const PROJECT_GROUPS_METHODS = {
-  projectGroupsCoordinate: "t3custom.groups.coordinate",
-  projectGroupsSnapshot: "t3custom.groups.snapshot",
-  projectGroupsSubscribe: "t3custom.groups.subscribe",
-  projectGroupsMutate: "t3custom.groups.mutate",
+  t3customProjectGroupsCoordinate: "t3custom.groups.coordinate",
+  t3customProjectGroupsSnapshot: "t3custom.groups.snapshot",
+  t3customProjectGroupsSubscribe: "t3custom.groups.subscribe",
+  t3customProjectGroupsMutate: "t3custom.groups.mutate",
 } as const;
 const error = Schema.Union([ProjectGroupsError, EnvironmentAuthorizationError]);
 export const PROJECT_GROUPS_RPCS = [
-  Rpc.make(PROJECT_GROUPS_METHODS.projectGroupsCoordinate, {
+  Rpc.make(PROJECT_GROUPS_METHODS.t3customProjectGroupsCoordinate, {
     payload: ProjectGroupsCoordinateInput,
     success: Schema.Struct({ threadId: ThreadId }),
     error,
   }),
-  Rpc.make(PROJECT_GROUPS_METHODS.projectGroupsSnapshot, {
+  Rpc.make(PROJECT_GROUPS_METHODS.t3customProjectGroupsSnapshot, {
     payload: Schema.Struct({}),
     success: ProjectGroupsSnapshot,
     error,
   }),
-  Rpc.make(PROJECT_GROUPS_METHODS.projectGroupsSubscribe, {
+  Rpc.make(PROJECT_GROUPS_METHODS.t3customProjectGroupsSubscribe, {
     payload: Schema.Struct({}),
     success: ProjectGroupsSnapshot,
     error,
     stream: true,
   }),
-  Rpc.make(PROJECT_GROUPS_METHODS.projectGroupsMutate, {
+  Rpc.make(PROJECT_GROUPS_METHODS.t3customProjectGroupsMutate, {
     payload: ProjectGroupsMutation,
     success: ProjectGroupsSnapshot,
     error,
   }),
 ] as const;
 export const PROJECT_GROUPS_SCOPES = {
-  [PROJECT_GROUPS_METHODS.projectGroupsCoordinate]: AuthOrchestrationOperateScope,
-  [PROJECT_GROUPS_METHODS.projectGroupsSnapshot]: AuthOrchestrationReadScope,
-  [PROJECT_GROUPS_METHODS.projectGroupsSubscribe]: AuthOrchestrationReadScope,
-  [PROJECT_GROUPS_METHODS.projectGroupsMutate]: AuthOrchestrationOperateScope,
+  [PROJECT_GROUPS_METHODS.t3customProjectGroupsCoordinate]: AuthOrchestrationOperateScope,
+  [PROJECT_GROUPS_METHODS.t3customProjectGroupsSnapshot]: AuthOrchestrationReadScope,
+  [PROJECT_GROUPS_METHODS.t3customProjectGroupsSubscribe]: AuthOrchestrationReadScope,
+  [PROJECT_GROUPS_METHODS.t3customProjectGroupsMutate]: AuthOrchestrationOperateScope,
 } as const;
 export const PROJECT_GROUPS_AGGREGATES = {
-  [PROJECT_GROUPS_METHODS.projectGroupsCoordinate]: "t3custom.groups",
-  [PROJECT_GROUPS_METHODS.projectGroupsSnapshot]: "t3custom.groups",
-  [PROJECT_GROUPS_METHODS.projectGroupsSubscribe]: "t3custom.groups",
-  [PROJECT_GROUPS_METHODS.projectGroupsMutate]: "t3custom.groups",
+  [PROJECT_GROUPS_METHODS.t3customProjectGroupsCoordinate]: "t3custom.groups",
+  [PROJECT_GROUPS_METHODS.t3customProjectGroupsSnapshot]: "t3custom.groups",
+  [PROJECT_GROUPS_METHODS.t3customProjectGroupsSubscribe]: "t3custom.groups",
+  [PROJECT_GROUPS_METHODS.t3customProjectGroupsMutate]: "t3custom.groups",
 } as const;

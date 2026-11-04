@@ -527,6 +527,31 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         undefined,
       );
 
+      const custom = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "1.0.0-preview.20261104.1",
+        false,
+        false,
+        undefined,
+        undefined,
+      ).pipe(
+        Effect.provide(
+          ConfigProvider.layer(
+            ConfigProvider.fromEnv({
+              env: {
+                T3CUSTOM_DESKTOP: "1",
+                T3CODE_DESKTOP_UPDATE_REPOSITORY: "ondraondra81/t3custom",
+              },
+            }),
+          ),
+        ),
+      );
+      assert.equal(custom.appId, "dev.ondraondra81.t3custom");
+      assert.equal(custom.productName, "T3 Custom");
+      assert.isNull(custom.publish);
+      assert.include(custom.mac, { identity: "-", hardenedRuntime: false });
+
       assert.isNull(preview.publish);
       assert.isNull(previewChannel.publish);
       assert.deepStrictEqual(release.publish, [

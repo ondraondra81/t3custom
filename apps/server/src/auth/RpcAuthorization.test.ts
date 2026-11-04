@@ -410,15 +410,15 @@ it.effect("rejects group edits before invoking the handler on a read-only connec
           tag,
         ): tag is Exclude<
           keyof typeof RPC_REQUIRED_SCOPES,
-          typeof WS_METHODS.projectGroupsMutate
-        > => tag !== WS_METHODS.projectGroupsMutate,
+          typeof WS_METHODS.t3customProjectGroupsMutate
+        > => tag !== WS_METHODS.t3customProjectGroupsMutate,
       ),
     );
     let handled = false;
     const client = yield* RpcTest.makeClient(group).pipe(
       Effect.provide(
         Layer.mergeAll(
-          group.toLayerHandler(WS_METHODS.projectGroupsMutate, () =>
+          group.toLayerHandler(WS_METHODS.t3customProjectGroupsMutate, () =>
             Effect.sync(() => {
               handled = true;
             }).pipe(Effect.andThen(Effect.never)),
@@ -428,7 +428,7 @@ it.effect("rejects group edits before invoking the handler on a read-only connec
       ),
     );
     expect(
-      yield* client[WS_METHODS.projectGroupsMutate]({
+      yield* client[WS_METHODS.t3customProjectGroupsMutate]({
         expectedRevision: 0,
         mutationId: "attempt",
         command: { type: "create", group: { id: "group", name: "Group", parentId: null } },

@@ -1,6 +1,10 @@
+import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { useUiStateStore } from "../uiStateStore";
 import { randomUUID } from "../lib/utils";
 import { useState } from "react";
-import type { EnvironmentId, ProjectGroup, ProjectId, ThreadId } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
+import type { ProjectGroup } from "@t3tools/contracts/t3custom/projectGroups";
 import { projectGroupPaths } from "@t3tools/client-runtime/t3custom/projectGroups";
 import { ChevronDownIcon, FolderIcon, Settings2Icon } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -14,7 +18,7 @@ import {
   DialogFooter,
 } from "../components/ui/dialog";
 import { SettingsRow } from "../components/settings/settingsLayout";
-import { resolveSidebarFolderDot } from "../components/Sidebar.logic";
+import { resolveSidebarFolderDot, resolveThreadLastVisitedAt } from "../components/Sidebar.logic";
 import type { SidebarProjectSnapshot } from "../sidebarProjectGrouping";
 import { useProjectGroupsEnabled, type ProjectGroupsController } from "./projectGroupsState";
 import type { ProjectGroupsRow } from "./projectGroupsTree";
@@ -54,7 +58,18 @@ export function ProjectGroupHeader({
   const canEdit = state?.writable && !controller.pending;
   const isGroup = row.kind === "group";
   const name = isGroup ? (row.group?.name ?? "Unassigned") : (label ?? "Environment");
-  const dot = isGroup ? resolveSidebarFolderDot(row.hiddenThreads) : null;
+  const localVisits = useUiStateStore((state) => state.threadLastVisitedAtById);
+  const dot = isGroup
+    ? resolveSidebarFolderDot(
+        row.hiddenThreads.map((thread) => ({
+          ...thread,
+          lastVisitedAt: resolveThreadLastVisitedAt(
+            thread.lastVisitedAt,
+            localVisits[scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id))],
+          ),
+        })),
+      )
+    : null;
   return (
     <li className="relative mt-2 list-none" style={{ marginInlineStart: row.depth * 12 }}>
       <div className="flex items-center gap-1">
@@ -89,7 +104,7 @@ export function ProjectGroupHeader({
             variant="ghost-muted"
             size="icon-xs"
             disabled={!canEdit}
-            aria-label={`Manage ${name}`}
+            aria-label={isGroup ? `Manage ${name}` : `New group in ${name}`}
             data-sidebar-action-for={row.id}
             onClick={() =>
               onEdit({
@@ -113,6 +128,7 @@ export function ProjectGroupHeader({
 
 export function ProjectGroupsEditor({
   target,
+  threads,
   controller,
   projects,
   onClose,
@@ -120,6 +136,7 @@ export function ProjectGroupsEditor({
   onCoordinate,
 }: {
   target: GroupEditorTarget;
+  threads: readonly EnvironmentThreadShell[];
   controller: ProjectGroupsController;
   projects: readonly SidebarProjectSnapshot[];
   onClose: () => void;
@@ -129,7 +146,11 @@ export function ProjectGroupsEditor({
   const snapshot = controller.snapshots.get(target.environmentId);
   const [name, setName] = useState(target.group?.name ?? "");
   const [parentId, setParentId] = useState(target.group?.parentId ?? target.parentId ?? "");
-  const [destination, setDestination] = useState(target.group?.id ?? "");
+  const [destination, setDestination] = useState(
+    target.group?.id ??
+      snapshot?.projects.find((entry) => entry.projectId === target.projectIds?.[0])?.groupId ??
+      "",
+  );
   const [beforeId, setBeforeId] = useState("");
   const [selectedProjects, setSelectedProjects] = useState<readonly ProjectId[]>(
     target.projectIds ?? [],
@@ -329,6 +350,51 @@ export function ProjectGroupsEditor({
                   >
                     Move selected projects here
                   </Button>
+                </div>
+              </details>
+              <details>
+                <summary className="cursor-pointer text-sm">
+                  Move or detach coordination threads
+                </summary>
+                <div className="flex flex-col gap-2 py-2">
+                  {snapshot.threads
+                    .filter((binding) => binding.groupId === target.group?.id)
+                    .map((binding) => {
+                      const thread = threads.find(
+                        (entry) =>
+                          entry.environmentId === target.environmentId &&
+                          entry.id === binding.threadId,
+                      );
+                      return (
+                        <label key={binding.threadId} className="flex flex-col gap-1 text-sm">
+                          {thread?.title ??
+                            (binding.pending
+                              ? "Pending coordination thread"
+                              : "Unavailable coordination thread")}
+                          <select
+                            className="rounded border bg-background p-2"
+                            value={binding.groupId}
+                            disabled={disabled}
+                            onChange={(event) =>
+                              void controller.mutate(target.environmentId, {
+                                type: "assignThread",
+                                threadId: binding.threadId,
+                                groupId: event.target.value || null,
+                              })
+                            }
+                          >
+                            <option value="">
+                              {binding.pending ? "Cancel pending setup" : "No group (keep thread)"}
+                            </option>
+                            {binding.pending ? (
+                              <option value={binding.groupId}>{paths.get(binding.groupId)}</option>
+                            ) : (
+                              options
+                            )}
+                          </select>
+                        </label>
+                      );
+                    })}
                 </div>
               </details>
               <Button

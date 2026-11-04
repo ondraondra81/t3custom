@@ -22,7 +22,7 @@ concurrency:
 jobs:
   check:
     if: github.repository == 'ondraondra81/t3custom'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
@@ -37,7 +37,11 @@ jobs:
       - name: Install test browser
         run: vp exec --filter @t3tools/web playwright install --with-deps chromium
       - name: Check fork changes
-        run: vp run check:changed 8b44f42b14c8e273156474a924ccf29680dd7857 --concurrency 2
+        shell: bash
+        run: |
+          baseline=$(cat .t3custom-upstream)
+          [[ "$baseline" =~ ^[0-9a-f]{40}$ ]]
+          vp run check:changed "$baseline" --concurrency 2
 
   mac:
     needs: check
@@ -64,7 +68,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$(uname -m)" = arm64
-          version="1.0.0-preview.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
+          base_version=$(node -p "require('./apps/desktop/package.json').version")
+          version="$base_version-preview.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           vp run dist:desktop:artifact --platform mac --target dmg --arch arm64 --build-version "$version" --verbose
       - name: Launch packaged app with isolated fixture data
@@ -77,6 +82,7 @@ jobs:
           hdiutil attach -nobrowse -readonly -mountpoint "$mount" "${dmg[0]}"
           trap 'hdiutil detach "$mount" -force >/dev/null || true' EXIT
           app="$mount/T3 Custom.app"
+          codesign --verify --deep --strict "$app"
           executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")
           node scripts/smoke-desktop-app.ts --executable "$app/Contents/MacOS/$executable" --artifacts-dir "$RUNNER_TEMP/t3custom-smoke"
       - name: Record provenance and checksums
@@ -105,7 +111,7 @@ jobs:
   release:
     needs: mac
     if: github.event_name == 'push' && github.ref == 'refs/heads/custom' || github.event_name == 'workflow_dispatch' && inputs.prepare_release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:

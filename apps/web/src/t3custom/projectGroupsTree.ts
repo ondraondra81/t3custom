@@ -1,4 +1,8 @@
-import type { EnvironmentId, ProjectGroup, ProjectGroupsSnapshot } from "@t3tools/contracts";
+import type { EnvironmentId } from "@t3tools/contracts";
+import type {
+  ProjectGroup,
+  ProjectGroupsSnapshot,
+} from "@t3tools/contracts/t3custom/projectGroups";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import type { SidebarProjectSnapshot } from "../sidebarProjectGrouping";
 

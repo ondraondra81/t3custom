@@ -1,13 +1,8 @@
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
-import {
-  CommandId,
-  ThreadId,
-  ProviderInstanceId,
-  ProjectId,
-  type ProjectGroupsMutation,
-} from "@t3tools/contracts";
+import { CommandId, ThreadId, ProviderInstanceId, ProjectId } from "@t3tools/contracts";
+import { type ProjectGroupsMutation } from "@t3tools/contracts/t3custom/projectGroups";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Fiber from "effect/Fiber";

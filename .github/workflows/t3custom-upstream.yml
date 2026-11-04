@@ -59,6 +59,9 @@ jobs:
             echo 'Upstream conflicts require a manual integration; no build was published.'
             exit 1
           fi
+          printf '%s\n' "$upstream_sha" > .t3custom-upstream
+          git add .t3custom-upstream
+          git commit -m "chore: record upstream validation baseline for $tag"
           git push origin "$branch"
           cat > "$RUNNER_TEMP/body.md" <<EOF
           Integrates upstream $tag ($upstream_sha) into T3 Custom.

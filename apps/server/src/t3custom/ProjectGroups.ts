@@ -1,12 +1,11 @@
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
+import { OrchestrationV2ThreadLaunchInput, type ThreadId } from "@t3tools/contracts";
 import {
-  OrchestrationV2ThreadLaunchInput,
   type ProjectGroupsCoordinateInput,
-  type ThreadId,
   ProjectGroupsError,
   ProjectGroupsSnapshot,
   ProjectGroupsMutation,
-} from "@t3tools/contracts";
+} from "@t3tools/contracts/t3custom/projectGroups";
 import {
   applyProjectGroupsCommand,
   emptyProjectGroups,

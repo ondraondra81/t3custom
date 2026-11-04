@@ -1,3 +1,4 @@
+import { ProjectGroupsError } from "@t3tools/contracts/t3custom/projectGroups";
 import * as ProjectGroups from "./t3custom/ProjectGroups.ts";
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 import * as Context from "effect/Context";
@@ -1998,10 +1999,15 @@ export const layerWsRpc = (
       });
 
       const handlers = ServerWsRpcGroup.of({
-        [WS_METHODS.projectGroupsCoordinate]: projectGroups.coordinate,
-        [WS_METHODS.projectGroupsSnapshot]: () => projectGroups.snapshot,
-        [WS_METHODS.projectGroupsSubscribe]: () => projectGroups.changes,
-        [WS_METHODS.projectGroupsMutate]: projectGroups.mutate,
+        [WS_METHODS.t3customProjectGroupsCoordinate]: (input) =>
+          startup.enqueueCommand(projectGroups.coordinate(input)).pipe(
+            Effect.catchTags({
+              ServerRuntimeStartupError: () => new ProjectGroupsError({ reason: "thread-setup" }),
+            }),
+          ),
+        [WS_METHODS.t3customProjectGroupsSnapshot]: () => projectGroups.snapshot,
+        [WS_METHODS.t3customProjectGroupsSubscribe]: () => projectGroups.changes,
+        [WS_METHODS.t3customProjectGroupsMutate]: projectGroups.mutate,
         [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command) =>
           Effect.annotateCurrentSpan({
             "orchestration_v2.command_id": command.commandId,

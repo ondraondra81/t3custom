@@ -1,9 +1,8 @@
+import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import type {
-  EnvironmentId,
   ProjectGroup,
   ProjectGroupsSnapshot,
-  ThreadId,
-} from "@t3tools/contracts";
+} from "@t3tools/contracts/t3custom/projectGroups";
 import type { Project } from "../types";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {

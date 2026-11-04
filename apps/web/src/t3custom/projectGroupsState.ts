@@ -1,4 +1,5 @@
-import { CommandId, ThreadId, type ProjectGroupsCoordinateInput } from "@t3tools/contracts";
+import { CommandId, ThreadId } from "@t3tools/contracts";
+import { type ProjectGroupsCoordinateInput } from "@t3tools/contracts/t3custom/projectGroups";
 import { serverEnvironment } from "../state/server";
 import { resolveProjectDefaultProviderModelSelection } from "../providerInstances";
 import { randomUUID } from "../lib/utils";
@@ -6,7 +7,8 @@ import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection
 import { useAtomValue } from "@effect/atom-react";
 import { createProjectGroupsAtoms } from "@t3tools/client-runtime/t3custom/projectGroups";
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
-import { EnvironmentId, type ProjectGroupsCommand } from "@t3tools/contracts";
+import { EnvironmentId } from "@t3tools/contracts";
+import { type ProjectGroupsCommand } from "@t3tools/contracts/t3custom/projectGroups";
 import { Atom, AsyncResult } from "effect/reactivity";
 import * as Schema from "effect/Schema";
 import { useState } from "react";
@@ -133,6 +135,7 @@ export function useProjectGroups(configs: ReadonlyMap<EnvironmentId, Environment
     return result.value.threadId;
   };
   return {
+    clearError: () => setError(null),
     coordinate,
     enabled,
     states,

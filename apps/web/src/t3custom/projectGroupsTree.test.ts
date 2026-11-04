@@ -1,10 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import {
-  EnvironmentId,
-  ProjectId,
-  ProviderInstanceId,
-  type ProjectGroupsSnapshot,
-} from "@t3tools/contracts";
+import { EnvironmentId, ProjectId, ProviderInstanceId } from "@t3tools/contracts";
+import { type ProjectGroupsSnapshot } from "@t3tools/contracts/t3custom/projectGroups";
 import { buildSidebarProjectSnapshots } from "../sidebarProjectGrouping";
 import type { Project } from "../types";
 import { makeThreadFixture } from "../test-fixtures";

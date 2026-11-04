@@ -2824,6 +2824,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     const path = yield* Path.Path;
     const repoRoot = yield* RepoRoot;
     buildConfig.mac = {
+      ...(customDesktop && !signed ? { identity: "-", hardenedRuntime: false } : {}),
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
       category: "public.app-category.developer-tools",

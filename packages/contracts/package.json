@@ -18,6 +18,10 @@
     "./relay": {
       "types": "./src/relay.ts",
       "import": "./src/relay.ts"
+    },
+    "./t3custom/projectGroups": {
+      "types": "./src/t3custom/projectGroups.ts",
+      "import": "./src/t3custom/projectGroups.ts"
     }
   },
   "scripts": {

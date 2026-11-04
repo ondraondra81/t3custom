@@ -2,7 +2,7 @@ import {
   ProjectGroupsError,
   type ProjectGroupsCommand,
   type ProjectGroupsSnapshot,
-} from "@t3tools/contracts";
+} from "@t3tools/contracts/t3custom/projectGroups";
 
 export const emptyProjectGroups: ProjectGroupsSnapshot = {
   version: 1,

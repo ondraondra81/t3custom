@@ -1,4 +1,5 @@
-import { WS_METHODS, type ProjectGroupsSnapshot } from "@t3tools/contracts";
+import { WS_METHODS } from "@t3tools/contracts";
+import { type ProjectGroupsSnapshot } from "@t3tools/contracts/t3custom/projectGroups";
 import type { Atom } from "effect/reactivity";
 import type { EnvironmentRegistry } from "../connection/registry.ts";
 import {
@@ -12,15 +13,15 @@ export function createProjectGroupsAtoms<R, E>(
   return {
     coordinate: createEnvironmentRpcCommand(runtime, {
       label: "t3custom:groups:coordinate",
-      tag: WS_METHODS.projectGroupsCoordinate,
+      tag: WS_METHODS.t3customProjectGroupsCoordinate,
     }),
     state: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
       label: "t3custom:groups",
-      tag: WS_METHODS.projectGroupsSubscribe,
+      tag: WS_METHODS.t3customProjectGroupsSubscribe,
     }),
     mutate: createEnvironmentRpcCommand(runtime, {
       label: "t3custom:groups:mutate",
-      tag: WS_METHODS.projectGroupsMutate,
+      tag: WS_METHODS.t3customProjectGroupsMutate,
     }),
   };
 }

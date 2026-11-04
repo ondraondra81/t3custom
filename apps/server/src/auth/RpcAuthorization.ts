@@ -1,4 +1,4 @@
-import { PROJECT_GROUPS_SCOPES } from "@t3tools/contracts";
+import { PROJECT_GROUPS_SCOPES } from "@t3tools/contracts/t3custom/projectGroups";
 import {
   CLIENT_GUARDED_RPC_SCOPES,
   type DeviceListInput,
