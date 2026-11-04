@@ -53,6 +53,7 @@ jobs:
       T3CUSTOM_DESKTOP: "1"
       T3CODE_DESKTOP_UPDATE_REPOSITORY: ondraondra81/t3custom
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      CSC_FOR_PULL_REQUEST: "true"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -90,7 +91,7 @@ jobs:
         run: |
           set -euo pipefail
           git rev-parse HEAD > release/COMMIT.txt
-          printf '%s\n' 'Unsigned Apple Silicon preview. Install manually; built-in updates are disabled.' > release/INSTALL.txt
+          printf '%s\n' 'Ad-hoc signed Apple Silicon preview, without Developer ID or notarization. Install manually; built-in updates are disabled.' > release/INSTALL.txt
           cd release
           shasum -a 256 ./*.dmg > SHA256SUMS
       - uses: actions/upload-artifact@v4

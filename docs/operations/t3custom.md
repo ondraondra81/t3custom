@@ -31,7 +31,8 @@ Once `custom` is the default branch, **T3 Custom upstream integration** checks s
 releases daily. `.t3custom-upstream` records the merged upstream commit; each integration updates
 it so validation covers the fork delta instead of every historical upstream change. It opens a draft integration PR and explicitly dispatches the desktop workflow for it.
 Merge conflicts stop the job, and existing integration branches are preserved for manual fixes.
-The explicit dispatch is needed because a push made with GitHub's workflow token does not start downstream workflows.
+The explicit dispatch is needed because `upstream/*` is outside the desktop workflow's push filter,
+and a PR created with GitHub's workflow token does not start downstream workflows.
 Repository settings must permit Actions to create pull requests. The repository-only writable
 deploy key in `T3CUSTOM_SYNC_SSH_KEY` pushes integration branches: GitHub's built-in workflow token
 cannot push upstream commits that change workflow files. Rotate it by replacing the repository
