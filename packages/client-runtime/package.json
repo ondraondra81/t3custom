@@ -518,6 +518,10 @@
     "./provider-clients": {
       "types": "./src/providerClients.ts",
       "default": "./src/providerClients.ts"
+    },
+    "./t3custom/projectGroups": {
+      "types": "./src/t3custom/projectGroups.ts",
+      "default": "./src/t3custom/projectGroups.ts"
     }
   },
   "scripts": {

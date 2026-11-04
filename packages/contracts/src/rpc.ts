@@ -1,3 +1,4 @@
+import { PROJECT_GROUPS_METHODS, PROJECT_GROUPS_RPCS } from "./t3custom/projectGroups.ts";
 import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
@@ -406,6 +407,7 @@ import { VcsError } from "./vcs.ts";
 import { Project, ProjectMutation, ProjectMutationError } from "./project.ts";
 
 export const WS_METHODS = {
+  ...PROJECT_GROUPS_METHODS,
   projectsListEntries: "projects.listEntries",
   projectsListIgnoredFiles: "projects.listIgnoredFiles",
   projectsReadFile: "projects.readFile",
@@ -1988,6 +1990,7 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
 ) {}
 
 export const WsRpcGroup = RpcGroup.make(
+  ...PROJECT_GROUPS_RPCS,
   WsGuestShareCreateRpc,
   WsServerProbeRpc,
   WsServerGetConfigRpc,

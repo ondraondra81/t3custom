@@ -538,6 +538,7 @@ type SidebarThreadRowProps = {
   // "folder-multiline" adds the card's branch and PR line under it.
   variant: "card" | "slim" | "folder" | "folder-multiline";
   navigationParent?: string | undefined;
+  navigationDepth?: number;
   variantAction: SidebarSweepAction;
   settlementSupported: boolean;
   snoozeSupported: boolean;
@@ -970,6 +971,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
     ? {
         ref: sortable.setNodeRef,
         style: {
+          marginInlineStart: (props.navigationDepth ?? 0) * 12,
           transform: CSS.Translate.toString(sortable.transform),
           transition: sortable.transition,
           // A zero-height boundary also makes dnd-kit scale the source to

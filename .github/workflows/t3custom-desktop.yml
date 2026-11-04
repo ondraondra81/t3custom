@@ -1,0 +1,86 @@
+name: T3 Custom macOS preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [custom, feat/desktop-groups]
+  pull_request:
+    branches: [custom]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: t3custom-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: github.repository == 'ondraondra81/t3custom'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - name: Install test browser
+        run: vp exec --filter @t3tools/web playwright install --with-deps chromium
+      - name: Check fork changes
+        run: vp run check:changed 8b44f42b14c8e273156474a924ccf29680dd7857 --concurrency 2
+
+  mac:
+    needs: check
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      T3CUSTOM_DESKTOP: "1"
+      T3CODE_DESKTOP_UPDATE_REPOSITORY: ondraondra81/t3custom
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - name: Build Apple Silicon preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          version="1.0.0-preview.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
+          vp run dist:desktop:artifact --platform mac --target dmg --arch arm64 --build-version "$version" --verbose
+      - name: Launch packaged app with isolated fixture data
+        shell: bash
+        run: |
+          set -euo pipefail
+          mount="$RUNNER_TEMP/t3custom-launch"
+          dmg=(release/*.dmg)
+          test "${#dmg[@]}" -eq 1
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount" "${dmg[0]}"
+          trap 'hdiutil detach "$mount" -force >/dev/null || true' EXIT
+          app="$mount/T3 Custom.app"
+          executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")
+          node scripts/smoke-desktop-app.ts --executable "$app/Contents/MacOS/$executable" --artifacts-dir "$RUNNER_TEMP/t3custom-smoke"
+      - name: Record provenance and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD > release/COMMIT.txt
+          printf '%s\n' 'Unsigned Apple Silicon preview. Install manually; built-in updates are disabled.' > release/INSTALL.txt
+          cd release
+          shasum -a 256 ./*.dmg > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: t3custom-macos-arm64
+          path: |
+            release/*.dmg
+            release/COMMIT.txt
+            release/INSTALL.txt
+            release/SHA256SUMS
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: t3custom-launch-diagnostics
+          path: ${{ runner.temp }}/t3custom-smoke

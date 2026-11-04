@@ -1,0 +1,59 @@
+name: T3 Custom upstream integration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * *"
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: t3custom-upstream
+  cancel-in-progress: false
+
+jobs:
+  integrate:
+    if: github.repository == 'ondraondra81/t3custom' && github.event.repository.default_branch == 'custom'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: custom
+          fetch-depth: 0
+      - name: Prepare stable upstream integration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=$(gh api repos/pingdotgg/t3code/releases/latest --jq .tag_name)
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Not a stable version tag'; exit 1; }
+          git remote add upstream https://github.com/pingdotgg/t3code.git
+          git fetch upstream "refs/tags/$tag"
+          upstream_sha=$(git rev-parse 'FETCH_HEAD^{commit}')
+          if git merge-base --is-ancestor "$upstream_sha" HEAD; then exit 0; fi
+          branch="upstream/$tag"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo 'Integration branch already exists; keep its review and fixes.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          if ! git merge --no-edit "$upstream_sha"; then
+            git diff --name-only --diff-filter=U
+            echo 'Upstream conflicts require a manual integration; no build was published.'
+            exit 1
+          fi
+          git push origin "$branch"
+          cat > "$RUNNER_TEMP/body.md" <<EOF
+          Integrates upstream $tag ($upstream_sha) into T3 Custom.
+
+          Review the sidebar and desktop integration changes, inspect the **T3 Custom macOS preview** run dispatched for this branch. This automation does not merge or publish a release.
+          EOF
+          gh pr create --base custom --head "$branch" --title "chore: integrate upstream $tag" --body-file "$RUNNER_TEMP/body.md" --draft
+          gh workflow run t3custom-desktop.yml --ref "$branch"

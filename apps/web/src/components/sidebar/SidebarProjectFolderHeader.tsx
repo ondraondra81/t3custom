@@ -37,6 +37,8 @@ export function sidebarFolderRowId(projectKey: string) {
  */
 export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHeader(props: {
   group: SidebarProjectSnapshot;
+  parentId?: string | undefined;
+  depth?: number;
   collapsed: boolean;
   hiddenThreads: readonly EnvironmentThreadShell[];
   onToggle: (group: SidebarProjectSnapshot) => void;
@@ -44,7 +46,7 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
   onContextMenu: (group: SidebarProjectSnapshot, position: { x: number; y: number }) => void;
 }) {
   const { group, collapsed, hiddenThreads } = props;
-  const rowId = sidebarFolderRowId(group.projectKey);
+  const rowId = sidebarFolderRowId(group.folderId ?? group.projectKey);
   const localLastVisitedAtById = useUiStateStore((state) => state.threadLastVisitedAtById);
   const dot = collapsed
     ? resolveSidebarFolderDot(
@@ -62,11 +64,13 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
   return (
     <li
       data-testid="sidebar-project-folder"
+      style={{ marginInlineStart: (props.depth ?? 0) * 12 }}
       className="group/project-folder relative mt-2 list-none first:mt-0"
     >
       <button
         type="button"
         data-sidebar-row={rowId}
+        data-sidebar-parent={props.parentId}
         aria-expanded={!collapsed}
         onClick={() => props.onToggle(group)}
         onContextMenu={(event) => {

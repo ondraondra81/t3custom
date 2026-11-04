@@ -940,12 +940,14 @@ export function resolveSidebarFolderDot(
  * the same keys, so a legacy user's closed folders stay closed after regrouping.
  */
 export function sidebarFolderExpansionKeys(group: {
+  readonly folderId?: string;
   readonly projectKey: string;
   readonly memberProjects: ReadonlyArray<{
     readonly physicalProjectKey: string;
     readonly workspaceRoot: string;
   }>;
 }): string[] {
+  if (group.folderId) return [group.folderId];
   return [
     group.projectKey,
     ...group.memberProjects.map((member) => member.physicalProjectKey),

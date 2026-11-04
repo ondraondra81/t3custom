@@ -11,6 +11,7 @@ const isMainProcessExternal = (id: string) =>
   id === "electron" || id.startsWith("electron/") || isDesktopRuntimeExternalDependency(id);
 const shouldLaunchElectronAfterPack = process.env.T3CODE_DESKTOP_DEV === "1";
 const publicConfigDefine = {
+  __T3CUSTOM_DESKTOP__: JSON.stringify(process.env.T3CUSTOM_DESKTOP === "1"),
   __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__: JSON.stringify(
     repoEnv.T3CODE_CLERK_PUBLISHABLE_KEY?.trim() ?? "",
   ),

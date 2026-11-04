@@ -265,6 +265,7 @@ export const make = Effect.gen(function* () {
       environmentIcon: true,
       projectCloneTracking: true,
       projectOrganization: true,
+      t3customProjectGroups: true,
       ignoredFileListing: true,
       triage: true,
       oneTimeSchedules: true,

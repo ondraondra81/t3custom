@@ -401,3 +401,39 @@ it.effect("denies manual cleanup before the handler without settings permission"
     expect(handled).toBe(false);
   }).pipe(Effect.scoped),
 );
+
+it.effect("rejects group edits before invoking the handler on a read-only connection", () =>
+  Effect.gen(function* () {
+    const group = WsRpcGroup.omit(
+      ...[...WsRpcGroup.requests.keys()].filter(
+        (
+          tag,
+        ): tag is Exclude<
+          keyof typeof RPC_REQUIRED_SCOPES,
+          typeof WS_METHODS.projectGroupsMutate
+        > => tag !== WS_METHODS.projectGroupsMutate,
+      ),
+    );
+    let handled = false;
+    const client = yield* RpcTest.makeClient(group).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          group.toLayerHandler(WS_METHODS.projectGroupsMutate, () =>
+            Effect.sync(() => {
+              handled = true;
+            }).pipe(Effect.andThen(Effect.never)),
+          ),
+          RpcAuthorization.layer([AuthOrchestrationReadScope]),
+        ),
+      ),
+    );
+    expect(
+      yield* client[WS_METHODS.projectGroupsMutate]({
+        expectedRevision: 0,
+        mutationId: "attempt",
+        command: { type: "create", group: { id: "group", name: "Group", parentId: null } },
+      }).pipe(Effect.flip),
+    ).toMatchObject({ requiredPermission: AuthOrchestrationOperateScope });
+    expect(handled).toBe(false);
+  }).pipe(Effect.scoped),
+);

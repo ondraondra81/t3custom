@@ -1,3 +1,4 @@
+import * as ProjectGroups from "./t3custom/ProjectGroups.ts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -732,6 +733,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
 );
 
 const layerConfigSources = Layer.mergeAll(
+  Layer.mock(ProjectGroups.ProjectGroups)({}),
   Keybindings.layer,
   ServerSettings.layer.pipe(
     Layer.provide(Layer.merge(ServerSecretStore.layer, ManagedPolicy.layerTest())),

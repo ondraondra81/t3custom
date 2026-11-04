@@ -1,3 +1,11 @@
+import { seedCoordinationPrompt } from "../t3custom/coordinationPrompt";
+import { useProjectGroups, type ProjectGroupsController } from "../t3custom/projectGroupsState";
+import { splitProjectGroups, projectGroupsRows } from "../t3custom/projectGroupsTree";
+import {
+  ProjectGroupHeader,
+  ProjectGroupsEditor,
+  type GroupEditorTarget,
+} from "../t3custom/ProjectGroupsControls";
 import { liveShellEnvironmentIdsAtom } from "../state/shell";
 import { attachSidebarTree } from "../lib/sidebarTree";
 import { type EnvironmentId, type ScopedProjectRef } from "@t3tools/contracts";
@@ -424,6 +432,7 @@ function useSidebarThreads(input: {
   readonly routeRowThreadKey: string | null;
   // Set in boring mode: the project groups to fold active threads into, in order.
   readonly folderGroups: readonly SidebarProjectSnapshot[] | null;
+  readonly organizer: ProjectGroupsController;
   // Keeps folders with no active threads, so a project the user filtered to or pinned can start one.
   readonly keepEmptyFolders: (group: SidebarProjectSnapshot) => boolean;
 }) {
@@ -539,7 +548,13 @@ function useSidebarThreads(input: {
   const projectFolders =
     folderGroups === null
       ? null
-      : groupSidebarThreadsByProject(folderGroups, activeThreads, keepEmpty).map((folder) => {
+      : groupSidebarThreadsByProject(
+          input.organizer.enabled
+            ? splitProjectGroups(folderGroups, input.organizer.snapshots)
+            : folderGroups,
+          activeThreads,
+          keepEmpty,
+        ).map((folder) => {
           const collapsed = !resolveProjectExpanded(
             projectExpandedById,
             sidebarFolderExpansionKeys(folder.group),
@@ -556,11 +571,25 @@ function useSidebarThreads(input: {
               : EMPTY_THREADS,
           };
         });
+  const organizedRows =
+    input.organizer.enabled && projectFolders !== null
+      ? projectGroupsRows({
+          folders: projectFolders,
+          snapshots: input.organizer.snapshots,
+          environmentIds: input.organizer.states.map((state) => state.environmentId),
+          collapsed: input.organizer.collapsed,
+          routeThreadKey: routeRowThreadKey,
+        })
+      : null;
   const orderedThreads = [
     ...pinnedThreads,
     ...(projectFolders === null
       ? activeThreads
-      : projectFolders.flatMap((folder) => folder.threads)),
+      : organizedRows
+        ? organizedRows.flatMap((row) =>
+            row.kind === "folder" ? row.folder.threads : row.kind === "thread" ? [row.thread] : [],
+          )
+        : projectFolders.flatMap((folder) => folder.threads)),
     ...visibleWorkingThreads,
     ...visibleSnoozedThreads,
     ...renderedSettledThreads,
@@ -577,6 +606,7 @@ function useSidebarThreads(input: {
   }
   return {
     ...partition,
+    organizedRows,
     threads,
     workingShelfEnabled,
     searchableThreads: [
@@ -1006,7 +1036,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       );
     },
   });
-  const boringSidebarEnabled = useBoringSidebarEnabled();
+  const organizer = useProjectGroups(serverConfigs);
+  const [groupEditor, setGroupEditor] = useState<GroupEditorTarget | null>(null);
+  const upstreamBoringSidebarEnabled = useBoringSidebarEnabled();
+  const boringSidebarEnabled = organizer.enabled || upstreamBoringSidebarEnabled;
   const legacySidebarEnabled = useClientSettings((settings) => settings.legacySidebarEnabled);
   const folderRowsMultiline = useClientSettings((settings) => settings.boringSidebarMultilineRows);
   const newThreadContext = useHandleNewThread();
@@ -1275,6 +1308,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             [
               { id: "new-thread", label: "New thread" },
               { id: "copy-path", label: "Copy path" },
+              ...(organizer.enabled &&
+              organizer.snapshots.has(group.environmentId) &&
+              !group.isScratch
+                ? [{ id: "organize-project", label: "Move to group…" }]
+                : []),
               ...(canPinProject(group)
                 ? [
                     group.pinned
@@ -1298,6 +1336,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           case "pin":
           case "unpin":
             setProjectGroupPinned(group, clicked.value === "pin");
+            return;
+          case "organize-project":
+            setGroupEditor({
+              environmentId: group.environmentId,
+              projectIds: group.memberProjectRefs.map((ref) => ref.projectId),
+            });
             return;
           case "project-settings":
             openProjectSettings(group);
@@ -1330,6 +1374,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     workingShelfExpanded,
     toggleWorkingShelf,
     projectFolders,
+    organizedRows,
     toggleProjectFolder,
     renderedSettledThreads,
     visibleSnoozedThreads,
@@ -1344,6 +1389,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     pinnedKeysById,
     activeKeysById,
   } = useSidebarThreads({
+    organizer,
     projectScopeKey,
     scopedProjectKeys,
     serverConfigs,
@@ -1359,7 +1405,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         : scopedProjectGroups
       : null,
     keepEmptyFolders: (group) =>
-      scopedProjectGroups.length > 0 || (group.pinned && !group.archived),
+      scopedProjectGroups.length > 0 || ((organizer.enabled || group.pinned) && !group.archived),
   });
 
   // Ranked across environments as the palette ranks them, so one
@@ -1920,7 +1966,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         event.activatorEvent instanceof PointerEvent ? event.activatorEvent.clientY : null,
     });
   };
-  const hasProjectFolders = projectFolders !== null && projectFolders.length > 0;
+  const hasProjectFolders = (organizedRows?.length ?? projectFolders?.length ?? 0) > 0;
   const sidebarListItemsFresh = ((): readonly SidebarListItem[] => {
     const rowsOf = (
       list: readonly EnvironmentThreadShell[],
@@ -3310,6 +3356,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         section: SidebarSection,
                         // The tree row of the project folder this row sits in.
                         folderRow?: string,
+                        depth = 0,
                       ) => {
                         const threadKey = scopedThreadKey(
                           scopeThreadRef(thread.environmentId, thread.id),
@@ -3336,6 +3383,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             }
                             thread={thread}
                             variant={rowVariant}
+                            navigationDepth={depth}
                             navigationParent={
                               folderRow ??
                               (section === "working" ||
@@ -3442,6 +3490,43 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           // Folders draw active rows in their own place below.
                           if (projectFolders !== null && item.section === "active") continue;
                           items.push(renderThreadRow(threadByKey.get(item.key)!, item.section));
+                          continue;
+                        }
+                        if (organizedRows !== null && item.marker === "active-placeholder") {
+                          for (const row of organizedRows) {
+                            if (row.kind === "environment" || row.kind === "group") {
+                              items.push(
+                                <ProjectGroupHeader
+                                  key={row.id}
+                                  row={row}
+                                  controller={organizer}
+                                  onEdit={setGroupEditor}
+                                  label={environmentLabelById.get(row.environmentId)}
+                                />,
+                              );
+                            } else if (row.kind === "thread") {
+                              items.push(
+                                renderThreadRow(row.thread, "active", row.parentId, row.depth),
+                              );
+                            } else {
+                              const folder = row.folder;
+                              items.push(
+                                <SidebarProjectFolderHeader
+                                  key={row.id}
+                                  group={folder.group}
+                                  depth={row.depth}
+                                  parentId={row.parentId}
+                                  collapsed={folder.collapsed}
+                                  hiddenThreads={folder.hiddenThreads}
+                                  onToggle={toggleProjectFolder}
+                                  onNewThread={startThreadInProjectFolder}
+                                  onContextMenu={handleProjectFolderContextMenu}
+                                />,
+                              );
+                              for (const thread of folder.threads)
+                                items.push(renderThreadRow(thread, "active", row.id, row.depth));
+                            }
+                          }
                           continue;
                         }
                         if (projectFolders !== null && item.marker === "active-placeholder") {
@@ -3643,6 +3728,36 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         </SidebarGroup>
       </SidebarContent>
       <SidebarChromeFooter />
+      {groupEditor && (
+        <ProjectGroupsEditor
+          key={`${groupEditor.environmentId}:${groupEditor.group?.id ?? "new"}:${groupEditor.projectIds?.join(",") ?? ""}`}
+          target={groupEditor}
+          controller={organizer}
+          projects={projectGroups}
+          onTarget={setGroupEditor}
+          onCoordinate={async (target, resumeThreadId) => {
+            if (!target.group) return;
+            const threadId = await organizer.coordinate(
+              target.environmentId,
+              target.group.id,
+              resumeThreadId,
+            );
+            if (threadId === null) return;
+            const ref = scopeThreadRef(target.environmentId, threadId);
+            if (!resumeThreadId)
+              seedCoordinationPrompt(
+                target.environmentId,
+                threadId,
+                target.group,
+                organizer.snapshots.get(target.environmentId),
+                projectByKey,
+              );
+            setGroupEditor(null);
+            navigateToThread(ref);
+          }}
+          onClose={() => setGroupEditor(null)}
+        />
+      )}
     </>
   );
 }

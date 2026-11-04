@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { customDesktopIdentity } from "@t3tools/shared/t3custom/desktop";
 // @effect-diagnostics nodeBuiltinImport:off - Node's typed junction API avoids Windows symlink privileges while keeping the probe isolated.
 
 import * as NodeFSP from "node:fs/promises";
@@ -2770,11 +2771,14 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   wslRuntimeBundled = false,
   arch?: typeof BuildArch.Type,
 ) {
+  const customDesktop = yield* Config.Boolean("T3CUSTOM_DESKTOP").pipe(Config.withDefault(false));
   const buildConfig: Record<string, unknown> = {
     afterPack: (yield* Path.Path).join(yield* RepoRoot, "scripts/prepare-server-compile-cache.cjs"),
-    appId: DESKTOP_APP_ID,
-    productName: resolveDesktopProductName(version),
-    artifactName: "T3-Code-${version}-${arch}.${ext}",
+    appId: customDesktop ? customDesktopIdentity.appId : DESKTOP_APP_ID,
+    productName: customDesktop ? customDesktopIdentity.name : resolveDesktopProductName(version),
+    artifactName: customDesktop
+      ? "T3-Custom-${version}-${arch}.${ext}"
+      : "T3-Code-${version}-${arch}.${ext}",
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,
@@ -2845,17 +2849,19 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
           },
         ],
       },
-      protocols: [
-        {
-          name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
-        },
-        {
-          name: "Web site URL",
-          schemes: ["http", "https"],
-          role: "Viewer",
-        },
-      ],
+      protocols: customDesktop
+        ? []
+        : [
+            {
+              name: "T3 Code",
+              schemes: ["t3code", "t3code-dev"],
+            },
+            {
+              name: "Web site URL",
+              schemes: ["http", "https"],
+              role: "Viewer",
+            },
+          ],
       ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),
       ...(macPasskeySigning
         ? {
@@ -2869,7 +2875,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   if (platform === "mac" && target === "dmg") {
     buildConfig.dmg = {
       // Finder caches DMG backgrounds by volume name; give each installer its own.
-      title: `${resolveDesktopProductName(version)} ${version} Installer`,
+      title: `${customDesktop ? customDesktopIdentity.name : resolveDesktopProductName(version)} ${version} Installer`,
       background: `dmg/dmg-background-${updateChannel}.png`,
       window: {
         width: 640,

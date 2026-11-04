@@ -522,6 +522,11 @@
     "./cloneUrl": {
       "types": "./src/cloneUrl.ts",
       "import": "./src/cloneUrl.ts"
+    },
+    "./t3custom/projectGroups": "./src/t3custom/projectGroups.ts",
+    "./t3custom/desktop": {
+      "types": "./src/t3custom/desktop.ts",
+      "import": "./src/t3custom/desktop.ts"
     }
   },
   "scripts": {

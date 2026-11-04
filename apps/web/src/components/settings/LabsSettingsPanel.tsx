@@ -1,3 +1,4 @@
+import { ProjectGroupsSetting } from "../../t3custom/ProjectGroupsControls";
 import { useAuth } from "@clerk/react";
 import { Link } from "@tanstack/react-router";
 import { managedCapabilityDenial } from "@t3tools/contracts";
@@ -19,6 +20,7 @@ export function LabsSettingsPanel() {
   return (
     <SettingsPageContainer>
       <SettingsSection id="beta" title="Beta">
+        <ProjectGroupsSetting />
         <BoringSidebarRow />
         <BoringSidebarMultilineRow />
         {/* Clerk is only mounted when this build has T3 Connect. */}

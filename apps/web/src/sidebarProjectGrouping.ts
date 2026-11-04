@@ -36,6 +36,7 @@ export interface SidebarProjectGroupMember extends Project {
 }
 
 export interface SidebarProjectSnapshot extends Project {
+  folderId?: string;
   projectKey: string;
   displayName: string;
   groupedProjectCount: number;

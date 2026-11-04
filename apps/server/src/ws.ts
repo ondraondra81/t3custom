@@ -1,3 +1,4 @@
+import * as ProjectGroups from "./t3custom/ProjectGroups.ts";
 import { OrchestrationDispatchCommandError } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -1436,6 +1437,7 @@ export const layerWsRpc = (
       const checkpointDiffQuery = yield* CheckpointDiffQuery.CheckpointDiffQuery;
       const nativeChildWork = yield* NativeChildWorkQuery.NativeChildWorkQuery;
       const keybindings = yield* Keybindings.Keybindings;
+      const projectGroups = yield* ProjectGroups.ProjectGroups;
       const environmentTheme = yield* EnvironmentTheme.EnvironmentThemeService;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
       const remoteOpenTargets = yield* RemoteOpenTargets.RemoteOpenTargets;
@@ -1996,6 +1998,10 @@ export const layerWsRpc = (
       });
 
       const handlers = ServerWsRpcGroup.of({
+        [WS_METHODS.projectGroupsCoordinate]: projectGroups.coordinate,
+        [WS_METHODS.projectGroupsSnapshot]: () => projectGroups.snapshot,
+        [WS_METHODS.projectGroupsSubscribe]: () => projectGroups.changes,
+        [WS_METHODS.projectGroupsMutate]: projectGroups.mutate,
         [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command) =>
           Effect.annotateCurrentSpan({
             "orchestration_v2.command_id": command.commandId,
