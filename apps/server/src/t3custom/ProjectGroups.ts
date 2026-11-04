@@ -133,6 +133,9 @@ const make = Effect.gen(function* () {
       const saved = {
         ...document,
         snapshot: next,
+        pendingLaunches: (document.pendingLaunches ?? []).filter((launch) =>
+          next.threads.some((thread) => thread.threadId === launch.threadId && thread.pending),
+        ),
         receipts: [...document.receipts, { id: input.mutationId, request }].slice(-256),
       };
       yield* save(saved);
@@ -162,7 +165,6 @@ const make = Effect.gen(function* () {
       const launch: OrchestrationV2ThreadLaunchInput = {
         commandId: input.commandId,
         threadId: input.threadId,
-        reuseExistingThread: true,
         projectId: scratch.projectId,
         title: `${group.name} coordination`,
         modelSelection: input.modelSelection,
@@ -196,7 +198,6 @@ const make = Effect.gen(function* () {
         .launch({
           commandId: launch.commandId,
           threadId: input.threadId,
-          reuseExistingThread: true,
           projectId: launch.projectId,
           title: launch.title,
           modelSelection: launch.modelSelection,

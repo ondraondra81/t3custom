@@ -3744,14 +3744,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             );
             if (threadId === null) return;
             const ref = scopeThreadRef(target.environmentId, threadId);
-            if (!resumeThreadId)
-              seedCoordinationPrompt(
-                target.environmentId,
-                threadId,
-                target.group,
-                organizer.snapshots.get(target.environmentId),
-                projectByKey,
-              );
+            seedCoordinationPrompt(
+              target.environmentId,
+              threadId,
+              target.group,
+              organizer.snapshots.get(target.environmentId),
+              projectByKey,
+            );
             setGroupEditor(null);
             navigateToThread(ref);
           }}

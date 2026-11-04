@@ -9,7 +9,9 @@ Each server stores its own tree under its configured state directory; Mac and MF
 
 The **T3 Custom macOS preview** workflow checks changes, packages the existing desktop build,
 and opens the packaged app against an isolated database fixture. Download its
-`t3custom-macos-arm64` artifact. It contains the DMG, commit ID and SHA-256 checksums.
+`t3custom-macos-arm64` artifact. It contains the DMG, commit ID and SHA-256 checksums. Pushes to `custom` also prepare a
+complete draft GitHub release; a manual workflow dispatch can request the same. Publish the draft
+after reviewing the checks and package. Integration PR builds only produce artifacts.
 
 This preview has no Developer ID signature or notarization and no automatic update feed.
 Install each version manually; macOS may require allowing it in Privacy & Security.
@@ -28,7 +30,10 @@ Once `custom` is the default branch, **T3 Custom upstream integration** checks s
 releases daily. It opens a draft integration PR and explicitly dispatches the desktop workflow for it.
 Merge conflicts stop the job, and existing integration branches are preserved for manual fixes.
 The explicit dispatch is needed because a push made with GitHub's workflow token does not start downstream workflows.
-Repository settings must permit Actions to create pull requests.
+Repository settings must permit Actions to create pull requests. The repository-only writable
+deploy key in `T3CUSTOM_SYNC_SSH_KEY` pushes integration branches: GitHub's built-in workflow token
+cannot push upstream commits that change workflow files. Rotate it by replacing the repository
+deploy key and Actions secret together; never use a personal account token for this job.
 
 Keep upstream's hosted-service, npm-publishing and release workflows disabled on the fork.
 Our workflow has no upstream deployment secrets and never publishes the official npm package.

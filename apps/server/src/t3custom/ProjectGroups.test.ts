@@ -201,12 +201,29 @@ it.layer(NodeServices.layer)("project groups", (it) => {
           const service = yield* ProjectGroups.ProjectGroups;
           yield* service.coordinate({ type: "resume", threadId }).pipe(Effect.flip);
           assert.equal((yield* service.snapshot).threads.length, 1);
+          yield* service.mutate({
+            expectedRevision: 2,
+            mutationId: "remove-pending",
+            command: { type: "remove", groupId: "Minion" },
+          });
+          assert.equal(
+            (yield* service.coordinate({ type: "resume", threadId }).pipe(Effect.flip)).reason,
+            "missing-reference",
+          );
+          const config = yield* ServerConfig.ServerConfig;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const raw = yield* fs.readFileString(
+            path.join(config.stateDir, "t3custom", "sidebar-groups.v1.json"),
+          );
+          assert.deepEqual(JSON.parse(raw).pendingLaunches, []);
         }).pipe(Effect.provide(Layer.fresh(testLayer)));
         assert.equal(attempted.length, 2);
         assert.deepEqual(attempted[0], attempted[1]);
         assert.equal(attempted[1]?.threadId, threadId);
         assert.equal(attempted[1]?.commandId, commandId);
         assert.equal(attempted[1]?.initialMessage, undefined);
+        assert.notEqual(attempted[0]?.reuseExistingThread, true);
       }).pipe(Effect.provide(setup())),
   );
 

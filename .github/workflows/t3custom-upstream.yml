@@ -16,14 +16,19 @@ concurrency:
 
 jobs:
   integrate:
-    if: github.repository == 'ondraondra81/t3custom' && github.event.repository.default_branch == 'custom'
+    if: github.repository == 'ondraondra81/t3custom' && github.ref == 'refs/heads/custom'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Require repository-scoped integration key
+        env:
+          HAS_SYNC_KEY: ${{ secrets.T3CUSTOM_SYNC_SSH_KEY != '' }}
+        run: test "$HAS_SYNC_KEY" = true
       - uses: actions/checkout@v4
         with:
           ref: custom
           fetch-depth: 0
+          ssh-key: ${{ secrets.T3CUSTOM_SYNC_SSH_KEY }}
       - name: Prepare stable upstream integration
         env:
           GH_TOKEN: ${{ github.token }}

@@ -92,6 +92,12 @@ export function projectGroupsRows(input: {
           )
         : [],
     );
+    const children = new Map<string | null, ProjectGroup[]>();
+    for (const group of snapshot.groups) {
+      const siblings = children.get(group.parentId) ?? [];
+      siblings.push(group);
+      children.set(group.parentId, siblings);
+    }
     const foldersIn = (id: string | null) =>
       folders.filter((folder) => (placement.get(folder.group.id) ?? null) === id);
     const descendantThreads = (id: string): EnvironmentThreadShell[] => {
@@ -99,8 +105,8 @@ export function projectGroupsRows(input: {
       const pending = [id];
       while (pending.length > 0) {
         const parent = pending.pop();
-        for (const group of snapshot.groups)
-          if (group.parentId === parent && !ids.has(group.id)) {
+        for (const group of children.get(parent ?? null) ?? [])
+          if (!ids.has(group.id)) {
             ids.add(group.id);
             pending.push(group.id);
           }
@@ -134,8 +140,7 @@ export function projectGroupsRows(input: {
       });
       if (collapsed) return;
       if (group) {
-        for (const child of snapshot.groups)
-          if (child.parentId === group.id) visit(child, depth + 1, id);
+        for (const child of children.get(group.id) ?? []) visit(child, depth + 1, id);
         for (const thread of activeCoordination)
           if (coordination.get(thread.id) === group.id)
             rows.push({
@@ -163,7 +168,7 @@ export function projectGroupsRows(input: {
         });
       }
     };
-    for (const group of snapshot.groups) if (group.parentId === null) visit(group, 1, envId);
+    for (const group of children.get(null) ?? []) visit(group, 1, envId);
     if (foldersIn(null).length > 0) visit(null, 1, envId);
   }
   for (const folder of input.folders)

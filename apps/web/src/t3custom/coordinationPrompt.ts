@@ -6,7 +6,11 @@ import type {
 } from "@t3tools/contracts";
 import type { Project } from "../types";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { useComposerDraftStore } from "../composerDraftStore";
+import {
+  useComposerDraftStore,
+  resolveComposerDraftKey,
+  composerDraftHasUserContent,
+} from "../composerDraftStore";
 
 export function seedCoordinationPrompt(
   environmentId: EnvironmentId,
@@ -16,6 +20,10 @@ export function seedCoordinationPrompt(
   projects: ReadonlyMap<string, Project>,
 ) {
   if (!snapshot) return;
+  const ref = scopeThreadRef(environmentId, threadId);
+  const store = useComposerDraftStore.getState();
+  const draftKey = resolveComposerDraftKey(store, ref);
+  if (draftKey && composerDraftHasUserContent(store.draftsByThreadKey[draftKey])) return;
   const descendants = new Set([group.id]);
   const pending = [group.id];
   while (pending.length > 0) {
