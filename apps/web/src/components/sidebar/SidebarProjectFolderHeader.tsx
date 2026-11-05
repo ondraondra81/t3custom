@@ -1,7 +1,7 @@
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { ChevronDownIcon, SquarePenIcon } from "lucide-react";
-import { memo } from "react";
+import { memo, type ComponentProps } from "react";
 
 import { cn } from "~/lib/utils";
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
@@ -39,6 +39,7 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
   group: SidebarProjectSnapshot;
   parentId?: string | undefined;
   depth?: number;
+  dragProps?: Pick<ComponentProps<"button">, "draggable" | "onDragStart" | "onDragEnd">;
   collapsed: boolean;
   hiddenThreads: readonly EnvironmentThreadShell[];
   onToggle: (group: SidebarProjectSnapshot) => void;
@@ -68,10 +69,18 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
       className="group/project-folder relative mt-2 list-none first:mt-0"
     >
       <button
+        {...props.dragProps}
         type="button"
         data-sidebar-row={rowId}
         data-sidebar-parent={props.parentId}
         aria-expanded={!collapsed}
+        onKeyDown={(event) => {
+          if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+            event.preventDefault();
+            const rect = event.currentTarget.getBoundingClientRect();
+            props.onContextMenu(group, { x: rect.left, y: rect.bottom });
+          }
+        }}
         onClick={() => props.onToggle(group)}
         onContextMenu={(event) => {
           event.preventDefault();

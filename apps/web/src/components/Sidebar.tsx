@@ -1,3 +1,9 @@
+import { useProjectGroupsDrag } from "../t3custom/projectGroupsDrag";
+import {
+  projectDestinationMenu,
+  moveProjectFromMenu,
+  showProjectGroupMenu,
+} from "../t3custom/projectGroupsMenu";
 import { seedCoordinationPrompt } from "../t3custom/coordinationPrompt";
 import { useProjectGroups, type ProjectGroupsController } from "../t3custom/projectGroupsState";
 import { splitProjectGroups, projectGroupsRows } from "../t3custom/projectGroupsTree";
@@ -1037,6 +1043,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     },
   });
   const organizer = useProjectGroups(serverConfigs);
+  const organizerDrag = useProjectGroupsDrag(organizer);
   const [groupEditor, setGroupEditorState] = useState<GroupEditorTarget | null>(null);
   const setGroupEditor = (target: GroupEditorTarget | null) => {
     organizer.clearError();
@@ -1312,11 +1319,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             [
               { id: "new-thread", label: "New thread" },
               { id: "copy-path", label: "Copy path" },
-              ...(organizer.enabled &&
-              organizer.snapshots.has(group.environmentId) &&
-              !group.isScratch
-                ? [{ id: "organize-project", label: "Move to group…" }]
-                : []),
+              ...projectDestinationMenu(organizer, group),
               ...(canPinProject(group)
                 ? [
                     group.pinned
@@ -1330,6 +1333,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           ),
         );
         if (clicked._tag === "Failure") return;
+        if (await moveProjectFromMenu(organizer, group, clicked.value)) return;
         switch (clicked.value) {
           case "new-thread":
             startThreadInProjectFolder(group);
@@ -1340,12 +1344,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           case "pin":
           case "unpin":
             setProjectGroupPinned(group, clicked.value === "pin");
-            return;
-          case "organize-project":
-            setGroupEditor({
-              environmentId: group.environmentId,
-              projectIds: group.memberProjectRefs.map((ref) => ref.projectId),
-            });
             return;
           case "project-settings":
             openProjectSettings(group);
@@ -1516,6 +1514,42 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     });
   };
 
+  const handleGroupCoordinate = useStableCallback(
+    async (target: GroupEditorTarget, resumeThreadId?: ThreadId) => {
+      if (!target.group) return;
+      const threadId = await organizer.coordinate(
+        target.environmentId,
+        target.group.id,
+        resumeThreadId,
+      );
+      if (threadId === null) return;
+      const ref = scopeThreadRef(target.environmentId, threadId);
+      seedCoordinationPrompt(
+        target.environmentId,
+        threadId,
+        target.group,
+        organizer.snapshots.get(target.environmentId),
+        projectByKey,
+      );
+      setGroupEditor(null);
+      navigateToThread(ref);
+    },
+  );
+  const handleGroupMenu = useStableCallback(
+    (
+      row: Parameters<typeof showProjectGroupMenu>[0]["row"],
+      position: { x: number; y: number },
+    ) => {
+      void showProjectGroupMenu({
+        row,
+        position,
+        controller: organizer,
+        threads,
+        onEdit: setGroupEditor,
+        onCoordinate: handleGroupCoordinate,
+      });
+    },
+  );
   const handleThreadFileDrop = async (threadRef: ScopedThreadRef, files: File[]) => {
     const dropId = queuePendingFileDrop({ threadRef, files });
     const landedBefore =
@@ -3504,7 +3538,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                   key={row.id}
                                   row={row}
                                   controller={organizer}
-                                  onEdit={setGroupEditor}
+                                  onMenu={handleGroupMenu}
+                                  drag={organizerDrag}
                                   label={environmentLabelById.get(row.environmentId)}
                                 />,
                               );
@@ -3519,6 +3554,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                   key={row.id}
                                   group={folder.group}
                                   depth={row.depth}
+                                  dragProps={organizerDrag.sourceProps(folder.group)}
                                   parentId={row.parentId}
                                   collapsed={folder.collapsed}
                                   hiddenThreads={folder.hiddenThreads}
@@ -3732,33 +3768,19 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         </SidebarGroup>
       </SidebarContent>
       <SidebarChromeFooter />
+      {organizer.enabled && organizer.error && !groupEditor && (
+        <div role="alert" className="flex items-center gap-2 px-3 py-2 text-xs text-error">
+          <span className="min-w-0 flex-1">{organizer.error}</span>
+          <Button variant="ghost-muted" size="sm" onClick={organizer.clearError}>
+            Dismiss
+          </Button>
+        </div>
+      )}
       {groupEditor && (
         <ProjectGroupsEditor
-          key={`${groupEditor.environmentId}:${groupEditor.group?.id ?? "new"}:${groupEditor.projectIds?.join(",") ?? ""}`}
+          key={`${groupEditor.environmentId}:${groupEditor.group?.id ?? "new"}:${groupEditor.parentId ?? "root"}`}
           target={groupEditor}
-          threads={threads}
           controller={organizer}
-          projects={projectGroups}
-          onTarget={setGroupEditor}
-          onCoordinate={async (target, resumeThreadId) => {
-            if (!target.group) return;
-            const threadId = await organizer.coordinate(
-              target.environmentId,
-              target.group.id,
-              resumeThreadId,
-            );
-            if (threadId === null) return;
-            const ref = scopeThreadRef(target.environmentId, threadId);
-            seedCoordinationPrompt(
-              target.environmentId,
-              threadId,
-              target.group,
-              organizer.snapshots.get(target.environmentId),
-              projectByKey,
-            );
-            setGroupEditor(null);
-            navigateToThread(ref);
-          }}
           onClose={() => setGroupEditor(null)}
         />
       )}

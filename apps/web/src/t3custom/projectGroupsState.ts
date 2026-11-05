@@ -144,6 +144,7 @@ export function useProjectGroups(configs: ReadonlyMap<EnvironmentId, Environment
     pending,
     error,
     mutate,
+    expand: (id: string) => setCollapsed((current) => current.filter((key) => key !== id)),
     toggle: (id: string) =>
       setCollapsed(
         collapsed.includes(id) ? collapsed.filter((key) => key !== id) : [...collapsed, id],
