@@ -5,14 +5,18 @@ import type { SidebarProjectSnapshot } from "../sidebarProjectGrouping";
 import type { ProjectGroupsController } from "./projectGroupsState";
 import { groupRowId } from "./projectGroupsTree";
 
+const PROJECT_DRAG_TYPE = "application/x-t3custom-project";
+
 export function canDropProjects(
   source: SidebarProjectSnapshot | null,
   environmentId: EnvironmentId,
   groupId: string | null,
   snapshot: ProjectGroupsSnapshot | undefined,
   writable: boolean,
+  dragTypes: readonly string[],
 ) {
   return Boolean(
+    dragTypes.includes(PROJECT_DRAG_TYPE) &&
     writable &&
     snapshot &&
     source &&
@@ -48,30 +52,31 @@ export function useProjectGroupsDrag(controller: ProjectGroupsController) {
           return;
         }
         event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData(
-          "application/x-t3custom-project",
-          project.folderId ?? project.projectKey,
-        );
+        event.dataTransfer.setData(PROJECT_DRAG_TYPE, project.folderId ?? project.projectKey);
         setSource(project);
         controller.clearError();
       },
       onDragEnd: end,
     }),
     targetProps: (environmentId: EnvironmentId, groupId: string | null, rowId: string) => {
-      const allowed = canDropProjects(
-        source,
-        environmentId,
-        groupId,
-        controller.snapshots.get(environmentId),
-        writable(environmentId),
-      );
+      const allowed = (event: DragEvent<HTMLButtonElement>) =>
+        canDropProjects(
+          source,
+          environmentId,
+          groupId,
+          controller.snapshots.get(environmentId),
+          writable(environmentId),
+          event.dataTransfer.types,
+        );
       return {
-        "data-drop-active": allowed && over === rowId ? "true" : undefined,
+        "data-drop-active":
+          source && writable(environmentId) && over === rowId ? "true" : undefined,
         onDragOver: (event: DragEvent<HTMLButtonElement>) => {
-          if (!source) return;
+          if (!source || !event.dataTransfer.types.includes(PROJECT_DRAG_TYPE)) return;
           event.preventDefault();
-          event.dataTransfer.dropEffect = allowed ? "move" : "none";
-          setOver(allowed ? rowId : null);
+          const accepted = allowed(event);
+          event.dataTransfer.dropEffect = accepted ? "move" : "none";
+          setOver(accepted ? rowId : null);
         },
         onDragLeave: (event: DragEvent<HTMLButtonElement>) => {
           if (
@@ -81,10 +86,10 @@ export function useProjectGroupsDrag(controller: ProjectGroupsController) {
             setOver(null);
         },
         onDrop: async (event: DragEvent<HTMLButtonElement>) => {
-          if (!source) return;
-          event.preventDefault();
+          const accepted = allowed(event);
           end();
-          if (!allowed) return;
+          if (!source || !accepted) return;
+          event.preventDefault();
           if (
             await controller.mutate(environmentId, {
               type: "assignProjects",

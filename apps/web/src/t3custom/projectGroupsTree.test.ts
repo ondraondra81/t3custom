@@ -42,15 +42,37 @@ const tree: ProjectGroupsSnapshot = {
 describe("organized sidebar", () => {
   it("only allows project drops into writable groups on their owning environment", () => {
     const [source] = snapshots([project("a")]);
-    expect(canDropProjects(source!, mac, "root", tree, true)).toBe(true);
-    expect(canDropProjects(source!, mac, null, tree, true)).toBe(true);
-    expect(canDropProjects(source!, mac, "child", tree, true)).toBe(false);
-    expect(canDropProjects(source!, mf1, "root", tree, true)).toBe(false);
-    expect(canDropProjects(source!, mac, "root", tree, false)).toBe(false);
-    expect(canDropProjects(source!, mac, "missing", tree, true)).toBe(false);
-    expect(canDropProjects(source!, mac, "root", undefined, true)).toBe(false);
-    expect(canDropProjects(null, mac, "root", tree, true)).toBe(false);
-    expect(canDropProjects({ ...source!, isScratch: true }, mac, "root", tree, true)).toBe(false);
+    expect(
+      canDropProjects(source!, mac, "root", tree, true, ["application/x-t3custom-project"]),
+    ).toBe(true);
+    expect(canDropProjects(source!, mac, "root", tree, true, ["Files"])).toBe(false);
+    expect(canDropProjects(source!, mac, "root", tree, true, ["text/plain"])).toBe(false);
+    expect(
+      canDropProjects(source!, mac, null, tree, true, ["application/x-t3custom-project"]),
+    ).toBe(true);
+    expect(
+      canDropProjects(source!, mac, "child", tree, true, ["application/x-t3custom-project"]),
+    ).toBe(false);
+    expect(
+      canDropProjects(source!, mf1, "root", tree, true, ["application/x-t3custom-project"]),
+    ).toBe(false);
+    expect(
+      canDropProjects(source!, mac, "root", tree, false, ["application/x-t3custom-project"]),
+    ).toBe(false);
+    expect(
+      canDropProjects(source!, mac, "missing", tree, true, ["application/x-t3custom-project"]),
+    ).toBe(false);
+    expect(
+      canDropProjects(source!, mac, "root", undefined, true, ["application/x-t3custom-project"]),
+    ).toBe(false);
+    expect(canDropProjects(null, mac, "root", tree, true, ["application/x-t3custom-project"])).toBe(
+      false,
+    );
+    expect(
+      canDropProjects({ ...source!, isScratch: true }, mac, "root", tree, true, [
+        "application/x-t3custom-project",
+      ]),
+    ).toBe(false);
     expect(
       canDropProjects(
         {
@@ -64,6 +86,7 @@ describe("organized sidebar", () => {
         "root",
         tree,
         true,
+        ["application/x-t3custom-project"],
       ),
     ).toBe(false);
   });

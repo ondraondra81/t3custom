@@ -74,13 +74,6 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
         data-sidebar-row={rowId}
         data-sidebar-parent={props.parentId}
         aria-expanded={!collapsed}
-        onKeyDown={(event) => {
-          if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
-            event.preventDefault();
-            const rect = event.currentTarget.getBoundingClientRect();
-            props.onContextMenu(group, { x: rect.left, y: rect.bottom });
-          }
-        }}
         onClick={() => props.onToggle(group)}
         onContextMenu={(event) => {
           event.preventDefault();

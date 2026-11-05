@@ -88,13 +88,6 @@ export function ProjectGroupHeader({
             event.preventDefault();
             onMenu(row, { x: event.clientX, y: event.clientY });
           }}
-          onKeyDown={(event) => {
-            if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
-              event.preventDefault();
-              const rect = event.currentTarget.getBoundingClientRect();
-              onMenu(row, { x: rect.left, y: rect.bottom });
-            }
-          }}
           data-sidebar-row={row.id}
           data-sidebar-parent={isGroup ? row.parentId : undefined}
           aria-expanded={isGroup ? !row.collapsed : true}

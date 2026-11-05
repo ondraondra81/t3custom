@@ -97,7 +97,7 @@ export async function showProjectGroupMenu(input: {
     root: string,
     exclude?: string,
   ): ContextMenuItem[] => [
-    item(root, () => action(null), { checked: current === null }),
+    item(root, () => action(null), { checked: current === null, disabled: current === null }),
     ...snapshot.groups
       .filter((candidate) => {
         let cursor: typeof candidate | undefined = candidate;
@@ -110,6 +110,7 @@ export async function showProjectGroupMenu(input: {
       .map((candidate) =>
         item(paths.get(candidate.id) ?? candidate.name, () => action(candidate.id), {
           checked: current === candidate.id,
+          disabled: current === candidate.id,
         }),
       ),
   ];
@@ -170,7 +171,8 @@ export async function showProjectGroupMenu(input: {
             input.threads.find(
               (thread) =>
                 thread.environmentId === row.environmentId && thread.id === binding.threadId,
-            )?.title ?? "Pending coordination thread",
+            )?.title ??
+            (binding.pending ? "Pending coordination thread" : "Unavailable coordination thread"),
           children: binding.pending
             ? [
                 item("Retry setup", () => onCoordinate(target, binding.threadId)),
