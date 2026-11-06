@@ -39,7 +39,9 @@ function database(file, label, head = 79) {
 }
 
 function fixture(t, head = 79) {
-  const home = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-profile-sync-"));
+  const home = NodeFS.realpathSync(
+    NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-profile-sync-")),
+  );
   t.after(() => NodeFS.rmSync(home, { recursive: true, force: true }));
   const paths = layout(home);
   for (const key of ["official", "custom"]) {
@@ -359,6 +361,19 @@ NodeTest.test("refuses open database handles and symlinks", (t) => {
     NodePath.join(paths.custom, "symlink"),
   );
   NodeAssert.throws(() => run("to-custom", { initialize: true }), /Symlink v datech/);
+});
+
+NodeTest.test("the Mac helper excludes only its own PID from application detection", (t) => {
+  const { paths } = fixture(t);
+  const helper = `${process.pid} /Applications/T3 Custom.app/Contents/MacOS/T3 Custom\n`;
+  let processes = helper;
+  const runCommand = (command) =>
+    command === "ps" ? { status: 0, stdout: processes } : { status: 1, stdout: "" };
+  NodeAssert.doesNotThrow(() => assertClosed(paths, runCommand));
+  for (const app of ["T3 Custom", "T3 Code", "T3 Code Nightly"]) {
+    processes = `${helper}${process.pid + 1} /Applications/${app}.app/Contents/MacOS/${app}\n`;
+    NodeAssert.throws(() => assertClosed(paths, runCommand), /Ukonci obe aplikace/);
+  }
 });
 
 for (const phase of ["saved", "installed"]) {

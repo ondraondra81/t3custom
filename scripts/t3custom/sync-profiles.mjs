@@ -267,7 +267,7 @@ export function layout(home) {
   };
 }
 
-export function assertClosed(paths) {
+export function assertClosed(paths, runCommand = NodeChildProcess.spawnSync) {
   const candidates = [paths.official, paths.custom]
     .flatMap((root) =>
       ["statev2.sqlite", "statev2.sqlite-wal", "server-owner.sqlite"].map((name) =>
@@ -281,7 +281,7 @@ export function assertClosed(paths) {
     )
     .filter(exists);
   if (candidates.length) {
-    const result = NodeChildProcess.spawnSync("lsof", ["-t", "--", ...candidates], {
+    const result = runCommand("lsof", ["-t", "--", ...candidates], {
       encoding: "utf8",
     });
     if (result.error || ![0, 1].includes(result.status))
@@ -289,9 +289,18 @@ export function assertClosed(paths) {
     if (result.stdout.trim())
       fail("T3 nebo jeho server jeste pouziva data. Ukonci obe aplikace pres Cmd+Q.");
   }
-  const result = NodeChildProcess.spawnSync("ps", ["-axo", "comm="], { encoding: "utf8" });
+  const result = runCommand("ps", ["-axo", "pid=,comm="], { encoding: "utf8" });
   if (result.error || result.status !== 0) fail("Nelze overit bezici aplikace.");
-  if (/\/T3 (?:Code[^/]*|Custom)\.app\/Contents\/MacOS\//.test(result.stdout))
+  if (
+    result.stdout.split("\n").some((line) => {
+      const match = /^\s*(\d+)\s+(.+)$/.exec(line);
+      return (
+        match &&
+        Number(match[1]) !== process.pid &&
+        /\/T3 (?:Code[^/]*|Custom)\.app\/Contents\/MacOS\//.test(match[2])
+      );
+    })
+  )
     fail("Ukonci obe aplikace pres Cmd+Q.");
 }
 
