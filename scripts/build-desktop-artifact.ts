@@ -2773,6 +2773,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
 ) {
   const customDesktop = yield* Config.Boolean("T3CUSTOM_DESKTOP").pipe(Config.withDefault(false));
   const buildConfig: Record<string, unknown> = {
+    ...(customDesktop && signed ? { forceCodeSigning: true } : {}),
     afterPack: (yield* Path.Path).join(yield* RepoRoot, "scripts/prepare-server-compile-cache.cjs"),
     appId: customDesktop ? customDesktopIdentity.appId : DESKTOP_APP_ID,
     productName: customDesktop ? customDesktopIdentity.name : resolveDesktopProductName(version),
@@ -2824,7 +2825,22 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     const path = yield* Path.Path;
     const repoRoot = yield* RepoRoot;
     buildConfig.mac = {
-      ...(customDesktop && !signed ? { identity: "-", hardenedRuntime: false } : {}),
+      ...(customDesktop
+        ? signed
+          ? {
+              hardenedRuntime: true,
+              notarize: true,
+              entitlements: path.join(
+                repoRoot,
+                "apps/desktop/resources/t3custom/entitlements.mac.plist",
+              ),
+              entitlementsInherit: path.join(
+                repoRoot,
+                "apps/desktop/resources/t3custom/entitlements.mac.plist",
+              ),
+            }
+          : { identity: "-", hardenedRuntime: false }
+        : {}),
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
       category: "public.app-category.developer-tools",
@@ -3803,8 +3819,10 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   const stageProdResourcesDir = path.join(stageAppDir, "apps/desktop/prod-resources");
   yield* fs.copy(stageResourcesDir, stageProdResourcesDir);
 
+  // Custom has no provisioning rights for upstream's Clerk associated domains.
+  const customDesktop = yield* Config.Boolean("T3CUSTOM_DESKTOP").pipe(Config.withDefault(false));
   const configuredMacPasskeySigning =
-    options.platform === "mac" && options.signed
+    options.platform === "mac" && options.signed && !customDesktop
       ? yield* Effect.try({
           try: () => resolveMacPasskeySigningConfiguration(loadRepoEnv({ repoRoot })),
           catch: MacPasskeySigningConfigurationResolutionError.fromCause,

@@ -13,8 +13,8 @@ and opens the packaged app against an isolated database fixture. Download its
 complete draft GitHub release; a manual workflow dispatch can request the same. Publish the draft
 after reviewing the checks and package. Integration PR builds only produce artifacts.
 
-The preview is ad-hoc signed for Apple Silicon, with no Developer ID signature, notarization
-or automatic update feed. No Apple Developer account is needed for ad-hoc signing.
+By default the preview is ad-hoc signed for Apple Silicon, with no Developer ID signature, notarization
+or automatic update feed. A manual signed build is available after the setup below. No Apple Developer account is needed for ad-hoc signing.
 Install each version manually; macOS may require allowing it in Privacy & Security.
 The fork uses `~/.t3custom` and a separate Chromium profile. It does not import an official
 installation's live state. Pair to an existing server through Connections, or add projects
@@ -70,15 +70,46 @@ new home, validate it on a separate port, then switch the service. Keep the old 
 untouched for rollback; never run the old binary against a database the new one has migrated.
 If migrating an existing host identity, avoid serving both copies to the same client at once.
 
-## Signed releases later
+## Developer ID signing and notarization
 
-Developer ID signing and notarization need paid Apple Developer Program membership. Store the
-certificate and notarization credentials in GitHub Secrets, available only to a protected release
-job after checks. Do not sign untrusted pull-request code.
+Paid Apple Developer Program membership is required. On the Mac, create a certificate signing
+request in Keychain Access (Certificate Assistant → Request a Certificate From a Certificate
+Authority → Saved to disk). In Apple Developer → Certificates, create **Developer ID Application**,
+upload the request, download the certificate and open it in Keychain Access. Export the matching
+identity from **My Certificates**, including its private key, as a password-protected `.p12`.
+Use Developer ID Application, not Apple Development, Apple Distribution or Developer ID Installer.
+If Apple asks for a certificate authority, use its current recommended G2 option.
 
-Use the existing packaging script with `--signed` and
-`T3CODE_DESKTOP_UPDATE_REPOSITORY=ondraondra81/t3custom`. Publish a complete release with DMG,
-ZIP, blockmaps and `latest-mac.yml`; preview versions deliberately have no updater feed.
-Verify an upgrade between two signed builds on the Mac before enabling that distribution path.
-Version our builds monotonically and record the upstream SHA independently. A binary downgrade
-does not reverse database migrations. MF1 server updates are a separate deployment.
+Create an app-specific password at <https://account.apple.com/> → Sign-In and Security →
+App-Specific Passwords, labelled `T3 Custom notarization`. Find the ten-character Team ID under
+Membership details at <https://developer.apple.com/account/>. Never use the main Apple password.
+
+With GitHub CLI installed and authenticated on the Mac, run:
+
+```sh
+bash scripts/t3custom/setup-apple-signing.sh
+```
+
+The helper prompts locally for the exported `.p12`, its password, Apple Account email, Team ID and
+app-specific password. It uploads directly to `ondraondra81/t3custom`'s `t3custom-apple` environment:
+`CSC_LINK` (base64 `.p12`), `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_TEAM_ID`, and
+`APPLE_APP_SPECIFIC_PASSWORD`. Nothing is pasted into chat or committed. This environment must
+allow deployments only from the **branch** `custom` (custom deployment branch policy; no tags).
+Keep these as environment secrets, not repository secrets. Re-running the helper replaces them.
+
+Dispatch **T3 Custom macOS preview** from `custom` with `signed=true` and `prepare_release=true`.
+Signed builds require all credentials and fail rather than falling back to ad-hoc signing. The
+packager notarizes and staples the app; the workflow also notarizes and staples the DMG. It checks
+Developer ID signature, stapled tickets and Gatekeeper assessment before opening the packaged app
+against fixture data and preparing a draft release. Checksums are calculated after stapling.
+Only publish after these steps pass. PRs and automatic push builds remain ad-hoc with no Apple
+secrets. The signed path is manual until the first real signed build has been accepted.
+
+The fork retains its bundle ID and data directories. It uses hardened runtime entitlements without
+upstream's restricted Clerk associated domains and provisioning profile; native passkey features
+requiring those entitlements are unavailable. This does not configure iOS distribution.
+
+Signing does not enable automatic updates: preview versions still have no updater feed. An updater
+rollout is separate and needs ZIP, blockmaps and `latest-mac.yml`, plus an upgrade test between two
+signed builds on the Mac. A binary downgrade does not reverse database migrations. MF1 server
+updates remain a separate deployment.

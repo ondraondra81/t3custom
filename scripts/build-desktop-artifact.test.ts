@@ -552,6 +552,33 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       assert.isNull(custom.publish);
       assert.include(custom.mac, { identity: "-", hardenedRuntime: false });
 
+      const signedCustom = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "0.1.7-preview.20261106.1",
+        true,
+        false,
+        undefined,
+        undefined,
+      ).pipe(
+        Effect.provide(
+          ConfigProvider.layer(
+            ConfigProvider.fromEnv({
+              env: { T3CUSTOM_DESKTOP: "1" },
+            }),
+          ),
+        ),
+      );
+      assert.isTrue(signedCustom.forceCodeSigning);
+      assert.isNull(signedCustom.publish);
+      assert.include(signedCustom.mac, { hardenedRuntime: true, notarize: true });
+      assert.notProperty(signedCustom.mac, "identity");
+      assert.notProperty(signedCustom.mac, "provisioningProfile");
+      assert.match(
+        (signedCustom.mac as Record<string, string>).entitlements!,
+        /t3custom[/\\]entitlements.mac.plist$/,
+      );
+
       assert.isNull(preview.publish);
       assert.isNull(previewChannel.publish);
       assert.deepStrictEqual(release.publish, [

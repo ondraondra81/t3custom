@@ -3,6 +3,10 @@ name: T3 Custom macOS preview
 on:
   workflow_dispatch:
     inputs:
+      signed:
+        description: Sign with Developer ID and notarize (custom branch only; Apple secrets required)
+        type: boolean
+        default: false
       prepare_release:
         description: Prepare a draft GitHub release after the packaged app passes its launch check
         type: boolean
@@ -45,6 +49,8 @@ jobs:
 
   mac:
     needs: check
+    if: ${{ !inputs.signed || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/custom') }}
+    environment: ${{ inputs.signed && 't3custom-apple' || 't3custom-preview' }}
     outputs:
       version: ${{ steps.build.outputs.version }}
     runs-on: macos-15
@@ -52,7 +58,8 @@ jobs:
     env:
       T3CUSTOM_DESKTOP: "1"
       T3CODE_DESKTOP_UPDATE_REPOSITORY: ondraondra81/t3custom
-      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      SIGNED_BUILD: ${{ inputs.signed && 'true' || 'false' }}
+      CSC_IDENTITY_AUTO_DISCOVERY: ${{ inputs.signed && 'true' || 'false' }}
       CSC_FOR_PULL_REQUEST: "true"
     steps:
       - uses: actions/checkout@v6
@@ -63,8 +70,26 @@ jobs:
             !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
       - uses: ./.github/actions/setup-ci-deps
+      - name: Require Apple credentials for signed build
+        if: inputs.signed
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!name}" ]]; then echo "Missing environment secret: $name" >&2; exit 1; fi
+          done
       - name: Build Apple Silicon preview
         id: build
+        env:
+          CSC_LINK: ${{ inputs.signed && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ inputs.signed && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ inputs.signed && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.signed && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ inputs.signed && secrets.APPLE_TEAM_ID || '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -72,7 +97,23 @@ jobs:
           base_version=$(node -p "require('./apps/desktop/package.json').version")
           version="$base_version-preview.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          vp run dist:desktop:artifact --platform mac --target dmg --arch arm64 --build-version "$version" --verbose
+          args=()
+          if [[ "$SIGNED_BUILD" == true ]]; then args+=(--signed); fi
+          vp run dist:desktop:artifact --platform mac --target dmg --arch arm64 --build-version "$version" "${args[@]}"
+      - name: Notarize and staple installer
+        if: inputs.signed
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg=(release/*.dmg)
+          test "${#dmg[@]}" -eq 1
+          xcrun notarytool submit "${dmg[0]}" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait --timeout 20m
+          xcrun stapler staple "${dmg[0]}"
+          xcrun stapler validate "${dmg[0]}"
       - name: Launch packaged app with isolated fixture data
         shell: bash
         run: |
@@ -84,6 +125,12 @@ jobs:
           trap 'hdiutil detach "$mount" -force >/dev/null || true' EXIT
           app="$mount/T3 Custom.app"
           codesign --verify --deep --strict "$app"
+          if [[ "$SIGNED_BUILD" == true ]]; then
+            codesign --display --verbose=4 "$app" 2> "$RUNNER_TEMP/t3custom-signature.txt"
+            grep -q '^Authority=Developer ID Application:' "$RUNNER_TEMP/t3custom-signature.txt"
+            xcrun stapler validate "$app"
+            spctl --assess --type execute --verbose=2 "$app"
+          fi
           executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")
           node scripts/smoke-desktop-app.ts --executable "$app/Contents/MacOS/$executable" --artifacts-dir "$RUNNER_TEMP/t3custom-smoke"
       - name: Record provenance and checksums
@@ -91,7 +138,11 @@ jobs:
         run: |
           set -euo pipefail
           git rev-parse HEAD > release/COMMIT.txt
-          printf '%s\n' 'Ad-hoc signed Apple Silicon preview, without Developer ID or notarization. Install manually; built-in updates are disabled.' > release/INSTALL.txt
+          if [[ "$SIGNED_BUILD" == true ]]; then
+            printf '%s\n' 'Developer ID signed and Apple notarized Apple Silicon preview. Install manually; built-in updates are disabled.' > release/INSTALL.txt
+          else
+            printf '%s\n' 'Ad-hoc signed Apple Silicon preview, without Developer ID or notarization. Install manually; built-in updates are disabled.' > release/INSTALL.txt
+          fi
           cd release
           shasum -a 256 ./*.dmg > SHA256SUMS
       - uses: actions/upload-artifact@v4
@@ -126,14 +177,20 @@ jobs:
           GH_REPO: ${{ github.repository }}
           BUILD_VERSION: ${{ needs.mac.outputs.version }}
           BUILD_COMMIT: ${{ github.sha }}
+          SIGNED_BUILD: ${{ inputs.signed && 'true' || 'false' }}
         shell: bash
         run: |
           set -euo pipefail
           tag="t3custom-v$BUILD_VERSION"
+          if [[ "$SIGNED_BUILD" == true ]]; then
+            signing='This build is signed with Developer ID and notarized by Apple.'
+          else
+            signing='This build has no Developer ID signature or notarization; macOS may require allowing it in System Settings → Privacy & Security.'
+          fi
           cat > "$RUNNER_TEMP/notes.md" <<EOF
           Apple Silicon preview of T3 Custom, built from $BUILD_COMMIT.
 
-          Download the DMG and install T3 Custom in Applications. This build has no Developer ID signature or notarization; macOS may require allowing it in System Settings → Privacy & Security.
+          Download the DMG and install T3 Custom in Applications. $signing
 
           Data and settings are separate from official T3 Code. Enable Project groups in Settings → Labs. This preview uses manual updates.
           EOF
