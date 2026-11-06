@@ -105,6 +105,12 @@ against fixture data and preparing a draft release. Checksums are calculated aft
 Only publish after these steps pass. PRs and automatic push builds remain ad-hoc with no Apple
 secrets. The signed path is manual until the first real signed build has been accepted.
 
+If notarization loses its network connection or times out after receiving a submission UUID,
+dispatch the same workflow with `notarization_id=<UUID>`. This only queries Apple (and retrieves
+its rejection log when available); it does not rebuild, resubmit or publish. Wait for the existing
+submission's result before deciding whether a rebuild is necessary. A failed packaging run does
+not retain its temporary signed bundle, so an accepted submission alone is not a downloadable release.
+
 The fork retains its bundle ID and data directories. It uses hardened runtime entitlements without
 upstream's restricted Clerk associated domains and provisioning profile; native passkey features
 requiring those entitlements are unavailable. This does not configure iOS distribution.

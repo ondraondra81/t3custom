@@ -3,6 +3,10 @@ name: T3 Custom macOS preview
 on:
   workflow_dispatch:
     inputs:
+      notarization_id:
+        description: Inspect an existing Apple submission instead of building (custom branch only)
+        type: string
+        default: ""
       signed:
         description: Sign with Developer ID and notarize (custom branch only; Apple secrets required)
         type: boolean
@@ -20,12 +24,36 @@ permissions:
   contents: read
 
 concurrency:
-  group: t3custom-desktop-${{ github.ref }}
+  group: t3custom-${{ inputs.notarization_id && 'notary-status' || 'desktop' }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  notary-status:
+    if: github.repository == 'ondraondra81/t3custom' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/custom' && inputs.notarization_id != ''
+    environment: t3custom-apple
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Inspect existing Apple notarization submission
+        env:
+          SUBMISSION_ID: ${{ inputs.notarization_id }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SUBMISSION_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]
+          args=(--apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID")
+          xcrun notarytool info "$SUBMISSION_ID" "${args[@]}" --output-format json > "$RUNNER_TEMP/notary-status.json"
+          cat "$RUNNER_TEMP/notary-status.json"
+          status=$(jq -r .status "$RUNNER_TEMP/notary-status.json")
+          if [[ "$status" == Invalid || "$status" == Rejected ]]; then
+            xcrun notarytool log "$SUBMISSION_ID" "${args[@]}" "$RUNNER_TEMP/notary-log.json"
+            cat "$RUNNER_TEMP/notary-log.json"
+          fi
   check:
-    if: github.repository == 'ondraondra81/t3custom'
+    if: github.repository == 'ondraondra81/t3custom' && !inputs.notarization_id
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
