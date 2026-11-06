@@ -1,3 +1,4 @@
+import { ProjectGroupsButton } from "../../t3custom/ProjectGroupsButton";
 import { useActiveNewTask } from "../../state/active-new-task";
 import { ThreadUndoNotice } from "../home/ThreadUndoNotice";
 import { useAndroidControlSizing } from "../../components/ui/useAndroidControlSizing";
@@ -607,6 +608,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
                 style={styles.threadList}
+                ListHeaderComponent={<ProjectGroupsButton />}
                 ListEmptyComponent={listEmpty}
               />
             </GestureDetector>
@@ -660,6 +662,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
                 style={styles.threadList}
+                ListHeaderComponent={<ProjectGroupsButton />}
                 ListEmptyComponent={listEmpty}
               />
             </GestureDetector>

@@ -75,6 +75,29 @@
       "ios": {
         "image": "macos-tahoe-26.6-xcode-27.1"
       }
+    },
+    "custom-testflight": {
+      "corepack": true,
+      "environment": "production",
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "T3CUSTOM_MOBILE": "1",
+        "APP_VARIANT": "production",
+        "NODE_OPTIONS": "--max-old-space-size=4096"
+      },
+      "ios": {
+        "image": "macos-tahoe-26.6-xcode-27.1"
+      }
+    },
+    "custom-simulator": {
+      "extends": "custom-testflight",
+      "environment": "preview",
+      "distribution": "internal",
+      "autoIncrement": false,
+      "ios": {
+        "simulator": true
+      }
     }
   },
   "submit": {
