@@ -21,6 +21,13 @@ installation's live state. Pair to an existing server through Connections, or ad
 to the new local environment. An official server will not offer group storage until upgraded.
 Back up both the database and group metadata before any later migration.
 
+For repeated manual switching on one Mac, use the standalone
+[profile transfer helper](../../scripts/t3custom/SYNC-README-cs.md). It supports both
+directions, retains Custom's group metadata and each app's pairing state, checks
+installed migration compatibility, refuses a changed destination, and keeps backups
+with recovery. Both apps must be closed. Chromium-only drafts remain in their own
+profiles. The helper's dedicated workflow tests isolated round trips on Linux and macOS.
+
 `T3CUSTOM_DESKTOP=1` enables the fork's build identity. The preview deliberately does not
 register the official application's OS URL handlers; open the app and add remote connections
 inside it. The desktop's internal renderer origin stays compatible with upstream authentication.

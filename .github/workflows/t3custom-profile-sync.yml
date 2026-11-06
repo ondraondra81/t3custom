@@ -1,0 +1,41 @@
+name: T3 Custom profile sync
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [custom, feat/profile-transfer]
+    paths:
+      - scripts/t3custom/sync-profiles.*
+      - scripts/t3custom/SYNC-README-cs.md
+      - .github/scripts/t3custom-profile-sync.test.mjs
+      - .github/workflows/t3custom-profile-sync.yml
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.repository == 'ondraondra81/t3custom'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-ci-deps
+      - name: Test transfer and recovery on isolated profiles
+        run: node --test .github/scripts/t3custom-profile-sync.test.mjs
+      - name: Check macOS launcher syntax
+        run: bash -n scripts/t3custom/sync-profiles.sh
+      - name: Package the standalone helper
+        if: runner.os == 'macOS'
+        working-directory: scripts/t3custom
+        run: zip t3-profile-sync-v1.zip sync-profiles.sh sync-profiles.mjs SYNC-README-cs.md
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: t3-profile-sync-v1
+          path: scripts/t3custom/t3-profile-sync-v1.zip
+          if-no-files-found: error
