@@ -11,7 +11,7 @@ if [[ -n "${T3CODE_HOME:-}" ]]; then
   exit 1
 fi
 
-sync_dir=$(cd "$(dirname "$0")" && pwd)
+sync_dir=$(cd "$(dirname "$0")" && pwd -P)
 for app in /Applications/*.app "$HOME"/Applications/*.app; do
   [[ -f "$app/Contents/Info.plist" ]] || continue
   bundle=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist" 2>/dev/null || true)

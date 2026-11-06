@@ -12,7 +12,9 @@ nainstalovaného T3 Custom; samostatný Node ani Python nepotřebuješ.
 
 Obě aplikace musejí být v `/Applications` nebo `~/Applications` a každou je potřeba
 alespoň jednou otevřít. Podporované jsou jejich výchozí profily `~/.t3/userdata`
-a `~/.t3custom/userdata`. Vlastní `T3CODE_HOME` a symlinky nástroj odmítne.
+a `~/.t3custom/userdata`. Vlastní `T3CODE_HOME`, symlinkované kořenové složky
+a symlinky uvnitř přenášených dat nástroj odmítne. Lokální odkazy providerů
+(například Codex shadow home) zachová jako odkazy; jejich cíle nekopíruje.
 
 Před každým přenosem dokonči nebo zastav běžící agenty, pozastav plánované úlohy
 a **obě aplikace ukonči přes Cmd+Q**. Samotné zavření okna nestačí. Nástroj odmítne
@@ -103,6 +105,14 @@ Každý přenos vypíše konkrétní zálohu v `~/.t3-profile-sync/backups/`. Ob
 profily před přenosem a původní cílovou složku. Zálohy obsahují soukromá data
 a přihlašovací údaje; nesdílej je. Nástroj je automaticky nemaže.
 
+Při častém střídání zálohy zabírají místo. Po ověření aktuální historie a při
+ukončených aplikacích i nástroji můžeš smazat starší složky `transfer-*` v
+`~/.t3-profile-sync/backups/`, jejichž starou historii už nepotřebuješ. **Ponech
+poslední zálohu**, kterou vypsal úspěšný přenos a na kterou odkazuje `backup` v
+`~/.t3-profile-sync/state.json`. Existuje-li `transaction.json`, nejprve dokonči
+`--recover` a žádné zálohy nemaž. Záznamy `state.json` ani `transaction.json`
+ručně nemaž.
+
 Poslední přenos lze vrátit, pokud od něj v cíli nevznikly další změny. Ukonči obě
 aplikace a použij cestu vypsanou přenosem:
 
@@ -122,6 +132,6 @@ Obnova odmítne přepsat práci, která v cíli vznikla po přenosu. Pokud nemů
 bezpečně rozpoznat, ponechá zálohy i záznam přenosu pro ruční řešení.
 
 Přenos uchovává vazby na relace providerů. Pokračování skutečného agenta a chování
-Klíčenky je potřeba při prvním použití ověřit na tvém Macu. Automatické testy
-kontrolují přenos tam a zpět, skutečné schéma databáze, WAL, konflikty, zachování
+Klíčenky je potřeba při prvním použití ověřit na tvém Macu. Testovací sada je
+určená pro Linux i macOS a kontroluje přenos tam a zpět, skutečné schéma databáze, WAL, konflikty, zachování
 lokálních přístupů a obnovu po chybě i náhlém ukončení procesu.

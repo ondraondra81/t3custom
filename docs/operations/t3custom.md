@@ -26,7 +26,7 @@ For repeated manual switching on one Mac, use the standalone
 directions, retains Custom's group metadata and each app's pairing state, checks
 installed migration compatibility, refuses a changed destination, and keeps backups
 with recovery. Both apps must be closed. Chromium-only drafts remain in their own
-profiles. The helper's dedicated workflow tests isolated round trips on Linux and macOS.
+profiles. The helper has a dedicated workflow configured for isolated round trips on Linux and macOS.
 
 `T3CUSTOM_DESKTOP=1` enables the fork's build identity. The preview deliberately does not
 register the official application's OS URL handlers; open the app and add remote connections

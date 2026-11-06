@@ -88,16 +88,19 @@ function sql(root, statement) {
 }
 
 function snapshot(root) {
-  return Object.fromEntries(
-    NodeFS.readdirSync(root, { recursive: true })
-      .sort()
-      .flatMap((name) => {
-        const file = NodePath.join(root, name);
-        return NodeFS.lstatSync(file).isFile()
-          ? [[name, NodeFS.readFileSync(file).toString("hex")]]
-          : [];
-      }),
-  );
+  const result = {};
+  const visit = (directory) => {
+    for (const entry of NodeFS.readdirSync(directory).sort()) {
+      const file = NodePath.join(directory, entry);
+      const name = NodePath.relative(root, file);
+      const stat = NodeFS.lstatSync(file);
+      if (stat.isSymbolicLink()) result[name] = `link:${NodeFS.readlinkSync(file)}`;
+      else if (stat.isDirectory()) visit(file);
+      else if (stat.isFile()) result[name] = NodeFS.readFileSync(file).toString("hex");
+    }
+  };
+  visit(root);
+  return result;
 }
 
 for (const head of [79, 80])
@@ -358,10 +361,114 @@ NodeTest.test("refuses open database handles and symlinks", (t) => {
   }
   NodeFS.symlinkSync(
     NodePath.join(paths.official, "settings.json"),
-    NodePath.join(paths.custom, "symlink"),
+    NodePath.join(paths.custom, "attachments", "symlink"),
   );
   NodeAssert.throws(() => run("to-custom", { initialize: true }), /Symlink v datech/);
 });
+
+NodeTest.test(
+  "local provider symlinks survive transfer and restore without following their targets",
+  (t) => {
+    const { paths, run, hooks } = fixture(t);
+    for (const key of ["official", "custom"]) {
+      const shadow = NodePath.join(paths[key], "providers", "codex", "extra", "shadow");
+      NodeFS.mkdirSync(shadow, { recursive: true });
+      NodeFS.symlinkSync(`../../../../../../${key}-external`, NodePath.join(shadow, "sessions"));
+      NodeFS.symlinkSync(`${key}-missing`, NodePath.join(shadow, "dangling"));
+      const external = NodePath.join(paths.home, `${key}-external`);
+      NodeFS.mkdirSync(external);
+      NodeFS.writeFileSync(NodePath.join(external, "keep"), key);
+      NodeFS.symlinkSync(external, NodePath.join(shadow, "absolute"));
+    }
+    const original = snapshot(paths.official);
+    const custom = snapshot(paths.custom);
+    const first = run("to-custom", { initialize: true });
+    NodeAssert.deepEqual(snapshot(paths.official), original);
+    NodeAssert.deepEqual(snapshot(NodePath.join(first.backup, "custom")), custom);
+    const link = NodePath.join("providers", "codex", "extra", "shadow", "sessions");
+    NodeAssert.equal(
+      NodeFS.readlinkSync(NodePath.join(paths.custom, link)),
+      "../../../../../../custom-external",
+    );
+    recover(paths, hooks, first.backup);
+    NodeAssert.deepEqual(snapshot(paths.custom), custom);
+    run("to-custom", { initialize: true });
+    run("to-official");
+    NodeAssert.equal(
+      NodeFS.readlinkSync(NodePath.join(paths.official, link)),
+      "../../../../../../official-external",
+    );
+    for (const key of ["official", "custom"])
+      NodeAssert.equal(
+        NodeFS.readFileSync(NodePath.join(paths.home, `${key}-external`, "keep"), "utf8"),
+        key,
+      );
+    NodeFS.symlinkSync(
+      "missing",
+      NodePath.join(paths.custom, "secrets", "provider-config-dangling.bin"),
+    );
+    NodeAssert.throws(() => run("to-official"), /Symlink v datech/);
+  },
+);
+
+NodeTest.test(
+  "shared roots reject dangling symlinks before any database or secret is read",
+  (t) => {
+    for (const name of ["settings.json", "statev2.sqlite", "secrets", "attachments"]) {
+      const { paths, run } = fixture(t);
+      const file = NodePath.join(paths.custom, name);
+      NodeFS.rmSync(file, { recursive: true, force: true });
+      NodeFS.symlinkSync("missing", file);
+      NodeAssert.throws(() => run("to-custom", { initialize: true }), /Symlink v datech/);
+      NodeAssert.equal(NodeFS.readlinkSync(file), "missing");
+    }
+  },
+);
+
+NodeTest.test("entry point runs when its containing directory is a symlink", (t) => {
+  const { paths } = fixture(t);
+  const alias = NodePath.join(paths.home, "helper-alias");
+  NodeFS.symlinkSync(
+    NodeURL.fileURLToPath(new URL("../../scripts/t3custom", import.meta.url)),
+    alias,
+  );
+  const result = NodeChildProcess.spawnSync(
+    process.execPath,
+    [NodePath.join(alias, "sync-profiles.mjs"), "--help"],
+    { encoding: "utf8" },
+  );
+  NodeAssert.equal(result.status, 0, result.stderr);
+  NodeAssert.match(result.stdout, /to-custom/);
+});
+
+NodeTest.test(
+  "recovery before the journal was written removes a stale lock without touching profiles",
+  (t) => {
+    const { paths, hooks } = fixture(t);
+    const original = snapshot(paths.official);
+    const custom = snapshot(paths.custom);
+    const lock = NodePath.join(paths.sync, "lock");
+    const child = NodeChildProcess.spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `
+    import * as fs from 'node:fs';
+    fs.mkdirSync(process.argv[1], {recursive:true});
+    fs.writeFileSync(process.argv[1] + '/pid', String(process.pid));
+  `,
+        lock,
+      ],
+      { encoding: "utf8" },
+    );
+    NodeAssert.equal(child.status, 0, child.stderr);
+    NodeAssert.deepEqual(recover(paths, hooks), { recovered: false });
+    NodeAssert.ok(!NodeFS.existsSync(lock));
+    NodeAssert.deepEqual(snapshot(paths.official), original);
+    NodeAssert.deepEqual(snapshot(paths.custom), custom);
+  },
+);
 
 NodeTest.test("the Mac helper excludes only its own PID from application detection", (t) => {
   const { paths } = fixture(t);

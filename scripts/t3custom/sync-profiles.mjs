@@ -46,26 +46,34 @@ function safePath(name) {
     current !== NodePath.dirname(current);
     current = NodePath.dirname(current)
   ) {
-    if (exists(current) && NodeFS.lstatSync(current).isSymbolicLink())
+    if (NodeFS.lstatSync(current, { throwIfNoEntry: false })?.isSymbolicLink())
       fail(`Datova cesta je symlink: ${current}`);
   }
 }
 
-function filesUnder(root) {
-  if (!exists(root)) return [];
-  const stat = NodeFS.lstatSync(root);
-  if (stat.isSymbolicLink()) fail(`Symlink v datech neni podporovany: ${root}`);
+function filesUnder(root, allowSymlinks = false) {
+  const stat = NodeFS.lstatSync(root, { throwIfNoEntry: false });
+  if (!stat) return [];
+  if (stat.isSymbolicLink()) {
+    if (allowSymlinks) return [root];
+    fail(`Symlink v datech neni podporovany: ${root}`);
+  }
   if (stat.isFile()) return [root];
   if (!stat.isDirectory()) fail(`Nepodporovany typ souboru: ${root}`);
   return NodeFS.readdirSync(root)
     .sort()
-    .flatMap((name) => filesUnder(NodePath.join(root, name)));
+    .flatMap((name) => filesUnder(NodePath.join(root, name), allowSymlinks));
 }
 
 function treeHash(root) {
   const hash = NodeCrypto.createHash("sha256");
-  for (const file of filesUnder(root)) {
-    hash.update(JSON.stringify(NodePath.relative(root, file)));
+  for (const file of filesUnder(root, true)) {
+    const relative = NodePath.relative(root, file);
+    if (NodeFS.lstatSync(file).isSymbolicLink()) {
+      hash.update(JSON.stringify([relative, "symlink", NodeFS.readlinkSync(file)]));
+      continue;
+    }
+    hash.update(JSON.stringify([relative, "file"]));
     const fd = NodeFS.openSync(file, "r");
     try {
       const buffer = Buffer.alloc(1024 * 1024);
@@ -80,13 +88,14 @@ function treeHash(root) {
 }
 
 function copy(source, target) {
-  if (!exists(source)) return;
-  filesUnder(source);
+  if (!NodeFS.lstatSync(source, { throwIfNoEntry: false })) return;
+  filesUnder(source, true);
   NodeFS.cpSync(source, target, {
     recursive: true,
     preserveTimestamps: true,
     errorOnExist: true,
     force: false,
+    verbatimSymlinks: true,
   });
 }
 
@@ -103,16 +112,24 @@ function tables(db) {
   return db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name").all();
 }
 
-function sharedHash(root) {
-  const hash = NodeCrypto.createHash("sha256");
-  const names = SHARED.filter((name) => !name.endsWith("-wal"));
-  if (exists(NodePath.join(root, "secrets"))) {
+function sharedPaths(root) {
+  const names = [...SHARED];
+  const secrets = NodePath.join(root, "secrets");
+  const stat = NodeFS.lstatSync(secrets, { throwIfNoEntry: false });
+  if (stat?.isSymbolicLink()) fail(`Symlink v datech neni podporovany: ${secrets}`);
+  if (stat) {
     names.push(
       ...NodeFS.readdirSync(NodePath.join(root, "secrets"))
         .filter((name) => SECRET.test(name))
         .map((name) => `secrets/${name}`),
     );
   }
+  return names;
+}
+
+function sharedHash(root) {
+  const hash = NodeCrypto.createHash("sha256");
+  const names = sharedPaths(root).filter((name) => !name.endsWith("-wal"));
   for (const name of names.sort()) {
     const file = NodePath.join(root, name);
     if (!exists(file)) continue;
@@ -343,9 +360,10 @@ export function transfer(paths, options, hooks) {
       fail("Prvni prenos vyzaduje --initialize: cilova historie bude po zaloze nahrazena zdrojem.");
     if (before && options.initialize)
       fail("Profily uz byly propojeny. --initialize nelze pouzit znovu.");
-    const bytes = [paths.official, paths.custom].map((root) =>
-      filesUnder(root).reduce((total, name) => total + NodeFS.statSync(name).size, 0),
-    );
+    const bytes = [paths.official, paths.custom].map((root) => {
+      for (const name of sharedPaths(root)) filesUnder(NodePath.join(root, name));
+      return filesUnder(root, true).reduce((total, name) => total + NodeFS.lstatSync(name).size, 0);
+    });
     const disk = NodeFS.statfsSync(paths.sync);
     if (disk.bavail * disk.bsize < 2 * (bytes[0] + bytes[1]) + 64 * 1024 * 1024)
       fail("Nedostatek mista pro zalohy a pracovni kopii.");
@@ -453,6 +471,7 @@ function recoverRecord(paths, record, hooks) {
 
 export function recover(paths, hooks, backup) {
   for (const name of Object.values(paths)) safePath(name);
+  NodeFS.mkdirSync(paths.sync, { recursive: true, mode: 0o700 });
   const lock = NodePath.join(paths.sync, "lock");
   if (exists(lock)) {
     const pidFile = NodePath.join(lock, "pid");
@@ -472,6 +491,10 @@ export function recover(paths, hooks, backup) {
   NodeFS.writeFileSync(NodePath.join(lock, "pid"), String(process.pid), { mode: 0o600 });
   try {
     const journal = NodePath.join(paths.sync, "transaction.json");
+    if (!backup && !exists(journal)) {
+      hooks.assertClosed(paths);
+      return { recovered: false };
+    }
     if (backup && exists(journal)) fail("Nejprve obnov preruseny prenos pomoci --recover.");
     if (backup) {
       const ledger = readJson(NodePath.join(paths.sync, "state.json"));
@@ -480,6 +503,7 @@ export function recover(paths, hooks, backup) {
     }
     const record = readJson(backup ? NodePath.join(backup, "transfer.json") : journal);
     recoverRecord(paths, record, hooks);
+    return { recovered: true };
   } finally {
     NodeFS.rmSync(lock, { recursive: true, force: true });
   }
@@ -651,8 +675,10 @@ export function main(args) {
   const paths = layout(NodeFS.realpathSync(NodeOS.homedir()));
   const hooks = { assertClosed, checkCompatibility: () => {} };
   if (args[0] === "--recover" && args.length === 1) {
-    recover(paths, hooks);
-    console.log("Predchozi stav byl obnoven.");
+    const result = recover(paths, hooks);
+    console.log(
+      result.recovered ? "Predchozi stav byl obnoven." : "Neni co obnovovat; zamek je uvolneny.",
+    );
     return;
   }
   if (args[0] === "--restore" && args.length === 2) {
@@ -686,7 +712,7 @@ export function main(args) {
 
 if (
   process.argv[1] &&
-  NodePath.resolve(process.argv[1]) === NodeURL.fileURLToPath(import.meta.url)
+  NodeFS.realpathSync(process.argv[1]) === NodeURL.fileURLToPath(import.meta.url)
 ) {
   try {
     main(process.argv.slice(2));
