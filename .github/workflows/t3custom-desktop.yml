@@ -97,9 +97,9 @@ jobs:
           base_version=$(node -p "require('./apps/desktop/package.json').version")
           version="$base_version-preview.$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          args=()
+          args=(--platform mac --target dmg --arch arm64 --build-version "$version")
           if [[ "$SIGNED_BUILD" == true ]]; then args+=(--signed); fi
-          vp run dist:desktop:artifact --platform mac --target dmg --arch arm64 --build-version "$version" "${args[@]}"
+          vp run dist:desktop:artifact "${args[@]}"
       - name: Notarize and staple installer
         if: inputs.signed
         env:
