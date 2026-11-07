@@ -8,7 +8,6 @@ on:
 permissions:
   actions: write
   contents: write
-  pull-requests: write
 
 concurrency:
   group: t3custom-upstream
@@ -18,7 +17,7 @@ jobs:
   integrate:
     if: github.repository == 'ondraondra81/t3custom' && github.ref == 'refs/heads/custom'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Require repository-scoped integration key
         env:
@@ -34,6 +33,9 @@ jobs:
           ref: custom
           fetch-depth: 0
           ssh-key: ${{ secrets.T3CUSTOM_SYNC_SSH_KEY }}
+      - uses: ./.github/actions/setup-ci-deps
+      - name: Install test browser
+        run: vp exec --filter @t3tools/web playwright install --with-deps chromium
       - name: Prepare stable upstream integration
         env:
           GH_TOKEN: ${{ github.token }}
@@ -41,32 +43,37 @@ jobs:
         run: |
           set -euo pipefail
           tag=$(gh api repos/pingdotgg/t3code/releases/latest --jq .tag_name)
-          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Not a stable version tag'; exit 1; }
+          if ! node scripts/t3custom/stable-release.ts stable-version "$tag"; then
+            echo 'Waiting for upstream v0.1.8 stable or newer.'
+            exit 0
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release or draft already exists; keep its artifacts and verification.'
+            exit 0
+          fi
           git remote add upstream https://github.com/pingdotgg/t3code.git
           git fetch upstream "refs/tags/$tag"
           upstream_sha=$(git rev-parse 'FETCH_HEAD^{commit}')
-          if git merge-base --is-ancestor "$upstream_sha" HEAD; then exit 0; fi
-          branch="upstream/$tag"
-          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
-            echo 'Integration branch already exists; keep its review and fixes.'
-            exit 0
-          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git switch -c "$branch"
-          if ! git merge --no-edit "$upstream_sha"; then
-            git diff --name-only --diff-filter=U
-            echo 'Upstream conflicts require a manual integration; no build was published.'
-            exit 1
+          if ! git merge-base --is-ancestor "$upstream_sha" HEAD; then
+            if ! git merge --no-ff -m "chore: integrate upstream $tag [skip ci]" "$upstream_sha"; then
+              git diff --name-only --diff-filter=U
+              echo 'Upstream conflicts require manual integration; custom has not changed.'
+              exit 1
+            fi
           fi
-          printf '%s\n' "$upstream_sha" > .t3custom-upstream
-          git add .t3custom-upstream
-          git commit -m "chore: record upstream validation baseline for $tag"
-          git push origin "$branch"
-          cat > "$RUNNER_TEMP/body.md" <<EOF
-          Integrates upstream $tag ($upstream_sha) into T3 Custom.
-
-          Review the sidebar and desktop integration changes, inspect the **T3 Custom macOS preview** run dispatched for this branch. This automation does not merge or publish a release.
-          EOF
-          gh pr create --base custom --head "$branch" --title "chore: integrate upstream $tag" --body-file "$RUNNER_TEMP/body.md" --draft
-          gh workflow run t3custom-desktop.yml --ref "$branch"
+          if [[ "$(cat .t3custom-upstream)" != "$upstream_sha" ]]; then
+            printf '%s\n' "$upstream_sha" > .t3custom-upstream
+            git add .t3custom-upstream
+            git commit -m "chore: record upstream baseline for $tag [skip ci]"
+          fi
+          vp i --frozen-lockfile
+          vp run check:changed "$upstream_sha" --concurrency 2
+          git push origin HEAD:custom
+          gh run list --workflow t3custom-desktop.yml --branch custom --event workflow_dispatch --limit 100 --json displayTitle > "$RUNNER_TEMP/desktop-runs.json"
+          if jq -e --arg title "T3 Custom $tag" 'any(.[]; .displayTitle == $title)' "$RUNNER_TEMP/desktop-runs.json" >/dev/null; then
+            echo 'A stable build was already dispatched; inspect its outcome before retrying notarization.'
+            exit 0
+          fi
+          gh workflow run t3custom-desktop.yml --ref custom -f signed=true -f prepare_release=true -f stable_tag="$tag" -f publish_release=true

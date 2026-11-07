@@ -27,16 +27,21 @@ inside it. The desktop's internal renderer origin stays compatible with upstream
 
 ## Upstream updates
 
-Once `custom` is the default branch, **T3 Custom upstream integration** checks stable upstream
-releases daily. `.t3custom-upstream` records the merged upstream commit; each integration updates
-it so validation covers the fork delta instead of every historical upstream change. It opens a draft integration PR and explicitly dispatches the desktop workflow for it.
-Merge conflicts stop the job, and existing integration branches are preserved for manual fixes.
-The explicit dispatch is needed because `upstream/*` is outside the desktop workflow's push filter,
-and a PR created with GitHub's workflow token does not start downstream workflows.
-Repository settings must permit Actions to create pull requests. The repository-only writable
-deploy key in `T3CUSTOM_SYNC_SSH_KEY` pushes integration branches: GitHub's built-in workflow token
-cannot push upstream commits that change workflow files. Rotate it by replacing the repository
-deploy key and Actions secret together; never use a personal account token for this job.
+The daily **T3 Custom upstream integration** workflow accepts only upstream stable tags from
+`v0.1.8` onward. It merges into a temporary checkout, updates `.t3custom-upstream`, and runs
+`check:changed` before pushing `custom`. Conflicts or failed checks leave the remote branch unchanged.
+The existing daily time is unchanged. Nightly releases never start this automatic chain.
+
+After integration it dispatches a signed desktop build with `stable_tag=<upstream-tag>` and
+`publish_release=true`. Existing releases, drafts or a previous stable build stop another dispatch;
+inspect a failed build and its existing Apple submission before manually retrying. Repository-scoped
+`T3CUSTOM_SYNC_SSH_KEY` is needed because the merge may update workflow files. Rotate it by replacing
+the repository deploy key and Actions secret together; never use a personal token for this job.
+
+Stable builds keep the upstream version and use the tag `v<version>` expected by Electron's GitHub
+provider. The workflow verifies the public upstream stable release, its exact commit in
+`.t3custom-upstream`, and its ancestry before accessing Apple signing secrets. It publishes only
+after checks, signatures, notarization, Gatekeeper and isolated launches pass.
 
 Keep every upstream workflow disabled on the fork, including `ci.yml` (its Blacksmith runners
 are unavailable here), hosted-service deployments, npm publishing and releases.
@@ -103,7 +108,7 @@ packager notarizes and staples the app; the workflow also notarizes and staples 
 Developer ID signature, stapled tickets and Gatekeeper assessment before opening the packaged app
 against fixture data and preparing a draft release. Checksums are calculated after stapling.
 Only publish after these steps pass. PRs and automatic push builds remain ad-hoc with no Apple
-secrets. The signed path is manual until the first real signed build has been accepted.
+secrets. Preview signing remains manually dispatched. Stable signing is dispatched by the integration workflow.
 
 If notarization loses its network connection or times out after receiving a submission UUID,
 dispatch the same workflow with `notarization_id=<UUID>`. This only queries Apple (and retrieves
@@ -115,7 +120,16 @@ The fork retains its bundle ID and data directories. It uses hardened runtime en
 upstream's restricted Clerk associated domains and provisioning profile; native passkey features
 requiring those entitlements are unavailable. This does not configure iOS distribution.
 
-Signing does not enable automatic updates: preview versions still have no updater feed. An updater
-rollout is separate and needs ZIP, blockmaps and `latest-mac.yml`, plus an upgrade test between two
-signed builds on the Mac. A binary downgrade does not reverse database migrations. MF1 server
-updates remain a separate deployment.
+Preview versions have no update feed. Stable builds use the existing upstream updater and UI,
+with `T3CODE_DESKTOP_UPDATE_REPOSITORY=ondraondra81/t3custom` baked into the signed bundle.
+They distribute the signed ZIP, its blockmap and `latest-mac.yml` alongside the DMG. The workflow
+verifies the ZIP's signature, stapled ticket, bundle identity, version, fork feed and launch.
+After DMG stapling it refreshes that asset's manifest hash; a changed ZIP fails verification.
+Checksums cover every distributed update asset. The stable release is published as GitHub's latest
+release, so existing preview prereleases are not offered to stable clients.
+
+For an existing preview, install the first updater-enabled stable DMG manually. Subsequent stable
+updates use the upstream controls. Do not redirect the machine-wide managed-policy feed: it is
+shared with official T3. End-to-end acceptance still requires an actual signed-to-signed update
+on a Mac. A binary downgrade does not reverse database migrations. MF1 server updates remain a
+separate deployment.
