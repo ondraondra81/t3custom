@@ -33,7 +33,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: t3custom-${{ inputs.notarization_id && 'notary-status' || 'desktop' }}-${{ github.ref }}
+  group: t3custom-${{ inputs.notarization_id && 'notary-status' || inputs.stable_tag || 'desktop' }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -215,6 +215,7 @@ jobs:
           grep -qx 'provider: github' "$feed"
           grep -qx 'owner: ondraondra81' "$feed"
           grep -qx 'repo: t3custom' "$feed"
+          grep -qx 'updaterCacheDirName: t3custom-updater' "$feed"
           executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")
           node scripts/smoke-desktop-app.ts --executable "$app/Contents/MacOS/$executable" --artifacts-dir "$RUNNER_TEMP/t3custom-update-smoke"
       - name: Record provenance and checksums
@@ -294,6 +295,15 @@ jobs:
           test "$(cat release/COMMIT.txt)" = "$BUILD_COMMIT"
           if [[ -n "$STABLE_TAG" ]]; then
             tag="v$BUILD_VERSION"
+            refs=$(gh api "repos/$GH_REPO/git/matching-refs/tags/$tag")
+            object=$(jq -c --arg ref "refs/tags/$tag" '.[] | select(.ref == $ref) | .object' <<< "$refs")
+            while [[ -n "$object" && "$(jq -r .type <<< "$object")" == tag ]]; do
+              object=$(gh api "repos/$GH_REPO/git/tags/$(jq -r .sha <<< "$object")" --jq .object)
+            done
+            if [[ -n "$object" ]]; then
+              test "$(jq -r .type <<< "$object")" = commit
+              test "$(jq -r .sha <<< "$object")" = "$BUILD_COMMIT"
+            fi
             cat > "$RUNNER_TEMP/notes.md" <<EOF
           T3 Custom for Apple Silicon, based on upstream $STABLE_TAG. Source: $BUILD_COMMIT.
 
@@ -303,7 +313,12 @@ jobs:
           EOF
             gh release create "$tag" release/* --target "$BUILD_COMMIT" --title "T3 Custom $BUILD_VERSION" --notes-file "$RUNNER_TEMP/notes.md" --draft
             if [[ "$PUBLISH_RELEASE" == true ]]; then
-              gh release edit "$tag" --draft=false --latest
+              latest=$(gh release list --limit 100 --json tagName,isDraft,isPrerelease --jq '[.[] | select(.isDraft == false and .isPrerelease == false) | .tagName | select(test("^v[0-9]+[.][0-9]+[.][0-9]+$"))] | .[]' | sort -V | tail -1)
+              if [[ -z "$latest" || "$(printf '%s\n' "$latest" "$tag" | sort -V | tail -1)" == "$tag" ]]; then
+                gh release edit "$tag" --draft=false --latest
+              else
+                gh release edit "$tag" --draft=false --latest=false
+              fi
             fi
             exit 0
           fi

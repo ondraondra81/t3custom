@@ -549,6 +549,8 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       );
       assert.equal(custom.appId, "dev.ondraondra81.t3custom");
       assert.equal(custom.productName, "T3 Custom");
+      assert.deepStrictEqual(custom.extraMetadata, { name: "t3custom", productName: "T3 Custom" });
+      assert.notProperty(release, "extraMetadata");
       assert.isNull(custom.publish);
       assert.include(custom.mac, { identity: "-", hardenedRuntime: false });
 

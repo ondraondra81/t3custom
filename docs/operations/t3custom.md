@@ -38,8 +38,8 @@ inspect a failed build and its existing Apple submission before manually retryin
 `T3CUSTOM_SYNC_SSH_KEY` is needed because the merge may update workflow files. Rotate it by replacing
 the repository deploy key and Actions secret together; never use a personal token for this job.
 
-Stable builds keep the upstream version and use the tag `v<version>` expected by Electron's GitHub
-provider. The workflow verifies the public upstream stable release, its exact commit in
+Stable builds keep the upstream version and use the tag `v<version>` expected by upstream's release-notes link.
+Existing tags must resolve to the build commit; conflicting upstream tags stop publication. The workflow verifies the public upstream stable release, its exact commit in
 `.t3custom-upstream`, and its ancestry before accessing Apple signing secrets. It publishes only
 after checks, signatures, notarization, Gatekeeper and isolated launches pass.
 
@@ -122,6 +122,8 @@ requiring those entitlements are unavailable. This does not configure iOS distri
 
 Preview versions have no update feed. Stable builds use the existing upstream updater and UI,
 with `T3CODE_DESKTOP_UPDATE_REPOSITORY=ondraondra81/t3custom` baked into the signed bundle.
+Custom package metadata gives it a separate `t3custom-updater` download cache. Keep the Stable
+channel selected: this fork does not publish a Nightly update feed.
 They distribute the signed ZIP, its blockmap and `latest-mac.yml` alongside the DMG. The workflow
 verifies the ZIP's signature, stapled ticket, bundle identity, version, fork feed and launch.
 After DMG stapling it refreshes that asset's manifest hash; a changed ZIP fails verification.

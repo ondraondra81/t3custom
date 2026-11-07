@@ -51,6 +51,11 @@ jobs:
             echo 'Release or draft already exists; keep its artifacts and verification.'
             exit 0
           fi
+          gh run list --workflow t3custom-desktop.yml --branch custom --event workflow_dispatch --limit 100 --json displayTitle > "$RUNNER_TEMP/desktop-runs.json"
+          if jq -e --arg title "T3 Custom $tag" 'any(.[]; .displayTitle == $title)' "$RUNNER_TEMP/desktop-runs.json" >/dev/null; then
+            echo 'A stable build was already dispatched; inspect its outcome before retrying notarization.'
+            exit 0
+          fi
           git remote add upstream https://github.com/pingdotgg/t3code.git
           git fetch upstream "refs/tags/$tag"
           upstream_sha=$(git rev-parse 'FETCH_HEAD^{commit}')
@@ -71,9 +76,4 @@ jobs:
           vp i --frozen-lockfile
           vp run check:changed "$upstream_sha" --concurrency 2
           git push origin HEAD:custom
-          gh run list --workflow t3custom-desktop.yml --branch custom --event workflow_dispatch --limit 100 --json displayTitle > "$RUNNER_TEMP/desktop-runs.json"
-          if jq -e --arg title "T3 Custom $tag" 'any(.[]; .displayTitle == $title)' "$RUNNER_TEMP/desktop-runs.json" >/dev/null; then
-            echo 'A stable build was already dispatched; inspect its outcome before retrying notarization.'
-            exit 0
-          fi
           gh workflow run t3custom-desktop.yml --ref custom -f signed=true -f prepare_release=true -f stable_tag="$tag" -f publish_release=true
