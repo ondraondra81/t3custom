@@ -2785,9 +2785,8 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     afterPack: (yield* Path.Path).join(yield* RepoRoot, "scripts/prepare-server-compile-cache.cjs"),
     appId: customDesktop ? customDesktopIdentity.appId : DESKTOP_APP_ID,
     productName: customDesktop ? customDesktopIdentity.name : resolveDesktopProductName(version),
-    ...(customDesktop
-      ? { extraMetadata: { name: "t3custom", productName: customDesktopIdentity.name } }
-      : {}),
+    // Electron fixes the safeStorage key name before the async branded rename; preserve preview connections.
+    ...(customDesktop ? { extraMetadata: { name: "t3custom", productName: "t3code" } } : {}),
     artifactName: customDesktop
       ? "T3-Custom-${version}-${arch}.${ext}"
       : "T3-Code-${version}-${arch}.${ext}",
